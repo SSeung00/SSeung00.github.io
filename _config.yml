@@ -1,0 +1,35 @@
+title: "Structural Dynamics Research Log"
+description: "Ph.D. Student in Structural Dynamics"
+url: "https://SSeung00.github.io"
+baseurl: ""
+
+markdown: kramdown
+mathjax: true
+
+plugins:
+  - jekyll-seo-tag
+
+collections:
+  study:
+    output: true
+  hobby:
+    output: true
+  journal:
+    output: true
+
+defaults:
+  - scope:
+      path: ""
+      type: study
+    values:
+      layout: post
+  - scope:
+      path: ""
+      type: hobby
+    values:
+      layout: post
+  - scope:
+      path: ""
+      type: journal
+    values:
+      layout: post

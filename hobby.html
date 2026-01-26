@@ -1,0 +1,31 @@
+---
+layout: default
+title: Hobby
+permalink: /hobby.html
+---
+
+<section class="page">
+  <h1 class="page-title">Hobby</h1>
+  <p class="page-intro">사진, 여행, 일상 기록.</p>
+
+  {% if site.hobby and site.hobby.size > 0 %}
+    <div class="hobby-grid">
+      {% assign hobby_posts = site.hobby | sort: "date" | reverse %}
+      {% for post in hobby_posts %}
+        <article class="hobby-card">
+          {% if post.thumbnail %}
+            <a href="{{ post.url | relative_url }}">
+              <img src="{{ post.thumbnail | relative_url }}" alt="{{ post.title }}">
+            </a>
+          {% endif %}
+          <h2 class="hobby-title">
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+          </h2>
+          <p class="hobby-meta">{{ post.date | date: "%Y-%m-%d" }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="page-intro">아직 Hobby 글이 없습니다.</p>
+  {% endif %}
+</section>

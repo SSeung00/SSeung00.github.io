@@ -1,0 +1,24 @@
+---
+layout: default
+title: Journal
+permalink: /journal.html
+---
+
+<section class="page">
+  <h1 class="page-title">Journal</h1>
+  <p class="page-intro">연구 일기와 짧은 메모를 정리합니다.</p>
+
+  {% if site.journal and site.journal.size > 0 %}
+    <ul class="post-list">
+      {% assign journal_posts = site.journal | sort: "date" | reverse %}
+      {% for post in journal_posts %}
+        <li>
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+          <span class="post-date">{{ post.date | date: "%Y-%m-%d" }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="page-intro">아직 Journal 글이 없습니다.</p>
+  {% endif %}
+</section>

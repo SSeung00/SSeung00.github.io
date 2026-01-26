@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page.title }} | {{ site.title }}</title>
+    <meta name="description" content="{{ site.description }}">
+    <link rel="stylesheet" href="{{ "/assets/css/style.css" | relative_url }}">
+    {% seo %}
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [["$", "$"], ["\\(", "\\)"]],
+          displayMath: [["$$", "$$"], ["\\[", "\\]"]]
+        },
+        chtml: {
+          scale: 0.90
+        },
+        options: {
+          skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+        }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <a class="site-logo" href="{{ "/" | relative_url }}">My Daily Capture</a>
+        <nav class="site-nav">
+          <a href="{{ "/" | relative_url }}">Home</a>
+          <a href="{{ "/portfolio.html" | relative_url }}">Portfolio</a>
+          <a href="{{ "/study.html" | relative_url }}">Study</a>
+          <a href="{{ "/hobby.html" | relative_url }}">Hobby</a>
+          <a href="{{ "/journal.html" | relative_url }}">Journal</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      {{ content }}
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>© {{ "now" | date: "%Y" }} {{ site.title }}. All rights reserved.</p>
+        <p class="sns-links">
+          <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://scholar.google.com/" target="_blank" rel="noopener noreferrer">Google Scholar</a>
+          <a href="mailto:you@example.com">Email</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

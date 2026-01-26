@@ -1,0 +1,29 @@
+---
+layout: default
+title: Study
+permalink: /study.html
+---
+
+<section class="page">
+  <h1 class="page-title">Study</h1>
+  <p class="page-intro">전공 공부 기록을 주제별로 정리합니다.</p>
+
+  {% if site.study and site.study.size > 0 %}
+    {% assign grouped = site.study | group_by: "category" %}
+    {% for group in grouped %}
+      <div class="category-section">
+        <h2>{{ group.name }}</h2>
+        <ul class="post-list">
+          {% assign items = group.items | sort: "date" | reverse %}
+          {% for post in items %}
+            <li>
+              <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="page-intro">아직 Study 글이 없습니다.</p>
+  {% endif %}
+</section>
