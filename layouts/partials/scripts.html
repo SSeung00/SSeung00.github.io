@@ -1,0 +1,21 @@
+<script>
+  // ── Theme toggle ──────────────────────────────────────────────
+  const html      = document.documentElement;
+  const toggleBtn = document.getElementById('theme-toggle');
+
+  function applyTheme(theme) {
+    document.body.classList.add('theme-transition');
+    html.setAttribute('data-theme', theme);
+    localStorage.setItem('blog-theme', theme);
+    toggleBtn.textContent = theme === 'light' ? '🌙' : '☀️';
+    setTimeout(() => document.body.classList.remove('theme-transition'), 350);
+  }
+
+  const initTheme = html.getAttribute('data-theme') || 'dark';
+  toggleBtn.textContent = initTheme === 'light' ? '🌙' : '☀️';
+
+  toggleBtn.addEventListener('click', function () {
+    const current = html.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'light' ? 'dark' : 'light');
+  });
+</script>

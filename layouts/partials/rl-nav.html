@@ -1,0 +1,13 @@
+<nav class="rl-nav" aria-label="RL chapter navigation">
+  <div class="rl-nav-header">
+    <span class="rl-nav-title">{{ i18n "rl_nav_title" }}</span>
+  </div>
+  <ul class="rl-nav-list">
+    {{ $currentPermalink := .Permalink }}
+    {{ range .CurrentSection.Pages.ByWeight }}
+      <li class="rl-nav-item{{ if eq .Permalink $currentPermalink }} rl-nav-item--active{{ end }}">
+        <a href="{{ .Permalink }}">{{ .Title }}</a>
+      </li>
+    {{ end }}
+  </ul>
+</nav>

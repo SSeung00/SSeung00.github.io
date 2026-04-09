@@ -1,0 +1,30 @@
+<div class="container--narrow post-wrapper">
+
+  <a href="javascript:history.back()" class="post-back">{{ i18n "back_button" }}</a>
+
+  <article>
+    <header class="post-header">
+      {{ with .Params.category }}
+        <p class="post-eyebrow">{{ . }}</p>
+      {{ else }}
+        {{ with .Section }}
+          <p class="post-eyebrow">{{ . | title }}</p>
+        {{ end }}
+      {{ end }}
+
+      <h1 class="post-title">{{ .Title }}</h1>
+
+      <div class="post-meta-row">
+        <span class="post-date">{{ .Date.Format "2006년 01월 02일" }}</span>
+        {{ with .Params.category }}
+          <span class="tag">{{ . }}</span>
+        {{ end }}
+      </div>
+    </header>
+
+    <div class="post-content">
+      {{ .Content }}
+    </div>
+  </article>
+
+</div>

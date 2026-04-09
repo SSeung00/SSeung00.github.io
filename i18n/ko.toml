@@ -1,0 +1,122 @@
+[nav_home]
+other = "Home"
+
+[nav_portfolio]
+other = "Portfolio"
+
+[nav_study]
+other = "Study"
+
+[nav_hobby]
+other = "Hobby"
+
+[nav_journal]
+other = "Journal"
+
+[study_eyebrow]
+other = "📚 Study Notes"
+
+[study_title]
+other = "Study"
+
+[study_description]
+other = "전공 공부 기록을 주제별로 정리합니다. 수업 노트, 논문 리뷰, 개념 정리 등."
+
+[hobby_eyebrow]
+other = "🏃 Hobby"
+
+[hobby_title]
+other = "Hobby"
+
+[hobby_description]
+other = "달리기 기록과 여행 사진, 일상의 순간들을 담습니다."
+
+[journal_eyebrow]
+other = "📖 Journal"
+
+[journal_title]
+other = "Journal"
+
+[journal_description]
+other = "일상, 생각, 읽은 것들을 가볍게 기록합니다."
+
+[filter_all]
+other = "All"
+
+[hobby_tab_running]
+other = "🏃 Running"
+
+[hobby_tab_travel]
+other = "✈️ Travel"
+
+[hobby_tab_etc]
+other = "📷 Etc"
+
+[empty_study]
+other = "아직 Study 글이 없습니다."
+
+[empty_hobby]
+other = "아직 Hobby 글이 없습니다."
+
+[empty_journal]
+other = "아직 작성된 Journal 글이 없습니다."
+
+[recent_journal]
+other = "Recent Journal"
+
+[back_button]
+other = "← 돌아가기"
+
+[hero_eyebrow]
+other = "📍 Seoul National University"
+
+[hero_title_1]
+other = "Seung's"
+
+[hero_title_2]
+other = "Daily Capture"
+
+[hero_subtitle]
+other = "구조동역학을 연구하는 박사과정 학생입니다. 공부 기록, 연구 노트, 그리고 달리기와 여행의 일상을 담습니다."
+
+[hero_btn_portfolio]
+other = "Portfolio →"
+
+[hero_btn_study]
+other = "Study Notes"
+
+[card_study_title]
+other = "Study"
+
+[card_study_desc]
+other = "전공, 수학, 강화학습 등 공부한 내용을 정리합니다."
+
+[card_hobby_title]
+other = "Hobby"
+
+[card_hobby_desc]
+other = "달리기 기록과 여행 사진, 일상의 순간들을 담습니다."
+
+[card_research_title]
+other = "Research"
+
+[card_research_desc]
+other = "구조동역학, 제어, AI를 중심으로 한 연구 활동."
+
+[card_journal_title]
+other = "Journal"
+
+[card_journal_desc]
+other = "일상, 생각, 읽은 것들을 가볍게 기록합니다."
+
+[rl_nav_title]
+other = "강화학습 목차"
+
+[footer_copyright]
+other = "© %s Seung · All rights reserved."
+
+[tag_journal]
+other = "Journal"
+
+[uncategorized]
+other = "Uncategorized"

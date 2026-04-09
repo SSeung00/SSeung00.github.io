@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="{{ .Site.Language.Lang }}">
+  <head>
+    {{ partial "head.html" . }}
+  </head>
+
+  <body data-section="{{ with .Params.section }}{{ . }}{{ else }}{{ .Section | default "home" }}{{ end }}">
+
+    {{ partial "header.html" . }}
+
+    <main>
+      {{ block "main" . }}{{ end }}
+    </main>
+
+    {{ partial "footer.html" . }}
+    {{ partial "scripts.html" . }}
+
+  </body>
+</html>
