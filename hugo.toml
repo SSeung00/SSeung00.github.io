@@ -27,6 +27,20 @@ defaultContentLanguageInSubdir = false
   [markup.goldmark]
     [markup.goldmark.renderer]
       unsafe = true
+    [markup.goldmark.extensions]
+      # Fix: **bold**한글 — closing ** before Korean particles treated as non-delimiter
+      # CJK extension reclassifies CJK characters so emphasis delimiters work correctly
+      [markup.goldmark.extensions.cjk]
+        enable = true
+        eastAsianLineBreaks = false
+        escapedSpace = false
+      # Fix: \;\Big|\; inside $$...$$ — Goldmark escapes backslashes before MathJax
+      # Passthrough tells Goldmark not to process content between math delimiters at all
+      [markup.goldmark.extensions.passthrough]
+        enable = true
+        [markup.goldmark.extensions.passthrough.delimiters]
+          block = [["$$", "$$"]]
+          inline = [["$", "$"]]
   [markup.tableOfContents]
     startLevel = 2
     endLevel = 4

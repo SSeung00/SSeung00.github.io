@@ -1,4 +1,4 @@
----
+﻿---
 title: "Reinforcement Learning: Chapter 3 Finite Markov Decision Processes"
 category: Reinforcement Learning
 weight: 3
@@ -30,12 +30,12 @@ date: 2026-04-09
 
 Chapter 2의 k-armed Bandit은 **상태(state)가 없고**, 행동이 미래에 영향을 미치지 않는 단순한 문제였습니다. Chapter 3에서는 이를 완전한 강화학습 문제로 확장합니다.
 
-**Markov Decision Process (MDP)**의 핵심 특징:
+**Markov Decision Process (MDP)​**의 핵심 특징:
 
-- Agent는 **상태(state) $S_t$**를 관측하고
-- **행동(action) $A_t$**을 선택하며
-- 환경은 **보상(reward) $R_{t+1}$**과 **다음 상태 $S_{t+1}$**을 돌려줌
-- 행동이 **미래 상태와 보상에 영향**을 미침 ← Bandit과의 결정적 차이
+- Agent는 **상태(state) $S_t$​**를 관측하고
+- **행동(action) $A_t$​**을 선택하며
+- 환경은 **보상(reward) $R_{t+1}$​**과 **다음 상태 $S_{t+1}$​**을 돌려줌
+- 행동이 **미래 상태와 보상에 영향​**을 미침 ← Bandit과의 결정적 차이
 
 ```
         행동 A_t
@@ -45,7 +45,7 @@ Agent ──────────────→ Environment
         보상 R_{t+1}
 ```
 
-이 상호작용이 매 time step $t = 0, 1, 2, \ldots$마다 반복되며 **궤적(trajectory)**을 형성합니다:
+이 상호작용이 매 time step $t = 0, 1, 2, \ldots$마다 반복되며 **궤적(trajectory)​**을 형성합니다:
 
 $$S_0, A_0, R_1, S_1, A_1, R_2, S_2, A_2, R_3, \ldots$$
 
@@ -55,13 +55,13 @@ $$S_0, A_0, R_1, S_1, A_1, R_2, S_2, A_2, R_3, \ldots$$
 
 ### Markov Property
 
-MDP의 핵심 가정은 **Markov 성질**입니다:
+MDP의 핵심 가정은 **Markov 성질​**입니다:
 
 $$P(S_{t+1}, R_{t+1} \mid S_t, A_t) = P(S_{t+1}, R_{t+1} \mid S_0, A_0, \ldots, S_t, A_t)$$
 
 > **"현재 상태가 미래를 결정하는 데 충분하다 — 과거는 현재 상태에 이미 요약되어 있다."**
 
-이 성질이 성립하기 때문에 과거 전체 이력을 기억할 필요 없이 **현재 상태만으로 최적 결정**이 가능합니다.
+이 성질이 성립하기 때문에 과거 전체 이력을 기억할 필요 없이 **현재 상태만으로 최적 결정​**이 가능합니다.
 
 ### 전이 함수 $p$
 
@@ -99,13 +99,13 @@ $$\text{MDP} = (\mathcal{S},\ \mathcal{A},\ p,\ \mathcal{R},\ \gamma)$$
 
 ## 3. Goals and Rewards: 보상 가설
 
-강화학습의 목표는 다음 **보상 가설(Reward Hypothesis)**로 요약됩니다:
+강화학습의 목표는 다음 **보상 가설(Reward Hypothesis)​**로 요약됩니다:
 
 > **"Agent의 목표는 미래에 받을 누적 보상의 기댓값을 최대화하는 것으로 표현될 수 있다."**
 
 ### 보상 설계의 원칙
 
-보상은 **무엇을 달성하길 원하는가**를 표현해야 하며, **어떻게 달성하는가**를 표현해서는 안 됩니다.
+보상은 **무엇을 달성하길 원하는가​**를 표현해야 하며, **어떻게 달성하는가​**를 표현해서는 안 됩니다.
 
 예시:
 - 체스: 이기면 +1, 지면 -1, 그 외 0 (중간 전략은 agent가 학습)
@@ -118,7 +118,7 @@ $$\text{MDP} = (\mathcal{S},\ \mathcal{A},\ p,\ \mathcal{R},\ \gamma)$$
 
 ### Episodic Task
 
-명확한 종료(terminal state)가 있는 task. 각 **에피소드(episode)**는 독립적입니다.
+명확한 종료(terminal state)가 있는 task. 각 **에피소드(episode)​**는 독립적입니다.
 
 단순 return:
 
@@ -126,7 +126,7 @@ $$G_t = R_{t+1} + R_{t+2} + \cdots + R_T$$
 
 ### Continuing Task와 할인율 $\gamma$
 
-종료가 없는 task에서는 $G_t$가 발산할 수 있습니다. 이를 해결하기 위해 **할인율 $\gamma \in [0, 1)$**을 도입:
+종료가 없는 task에서는 $G_t$가 발산할 수 있습니다. 이를 해결하기 위해 **할인율 $\gamma \in [0, 1)$​**을 도입:
 
 $$G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}$$
 
@@ -224,14 +224,14 @@ $$\boxed{v_\pi(s) = \sum_a \pi(a \mid s) \sum_{s', r} p(s', r \mid s, a)\left[r 
 
 ### Bellman Equation의 의미
 
-이 식은 **현재 상태의 가치를 다음 상태들의 가치로 표현**합니다:
+이 식은 **현재 상태의 가치를 다음 상태들의 가치로 표현​**합니다:
 
 ```
 v_π(s) = (현재 보상의 기대값) + γ × (다음 상태 가치의 기대값)
        = 즉각 보상 + 할인된 미래 가치
 ```
 
-이를 **backup diagram**으로 시각화하면:
+이를 **backup diagram​**으로 시각화하면:
 
 ```
         s
@@ -257,7 +257,7 @@ $$\boxed{q_\pi(s, a) = \sum_{s', r} p(s', r \mid s, a)\left[r + \gamma \sum_{a'}
 
 ### Bellman Equation은 연립 선형 방정식
 
-$|\mathcal{S}| = n$이면, $v_\pi$에 대한 Bellman equation은 **$n$개의 미지수를 가진 $n$개의 선형 방정식**입니다:
+$|\mathcal{S}| = n$이면, $v_\pi$에 대한 Bellman equation은 **$n$개의 미지수를 가진 $n$개의 선형 방정식​**입니다:
 
 $$\mathbf{v}_\pi = \mathbf{r}_\pi + \gamma \mathbf{P}_\pi \mathbf{v}_\pi$$
 
@@ -272,7 +272,7 @@ $$(\mathbf{I} - \gamma \mathbf{P}_\pi)\mathbf{v}_\pi = \mathbf{r}_\pi$$
 
 $$\mathbf{v}_\pi = (\mathbf{I} - \gamma \mathbf{P}_\pi)^{-1} \mathbf{r}_\pi$$
 
-$\gamma < 1$이면 $(\mathbf{I} - \gamma \mathbf{P}_\pi)$는 항상 가역(invertible)입니다. 하지만 상태 공간이 크면 역행렬 계산이 비현실적 → 이후 챕터에서 **반복적(iterative) 방법**으로 해결합니다.
+$\gamma < 1$이면 $(\mathbf{I} - \gamma \mathbf{P}_\pi)$는 항상 가역(invertible)입니다. 하지만 상태 공간이 크면 역행렬 계산이 비현실적 → 이후 챕터에서 **반복적(iterative) 방법​**으로 해결합니다.
 
 ---
 
@@ -284,7 +284,7 @@ Policy $\pi \geq \pi'$의 의미:
 
 $$\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s), \quad \forall s \in \mathcal{S}$$
 
-**정리**: 유한 MDP에서는 항상 **최적 정책(optimal policy) $\pi_*$**가 존재하며, 모든 $s$에서 다른 모든 policy보다 좋거나 같습니다.
+**정리**: 유한 MDP에서는 항상 **최적 정책(optimal policy) $\pi_*$​**가 존재하며, 모든 $s$에서 다른 모든 policy보다 좋거나 같습니다.
 
 ### Optimal Value Functions
 
@@ -423,7 +423,7 @@ Bellman Equation
                 └── TD / Q-learning (Ch.6~)
 ```
 
-강화학습의 거의 모든 알고리즘은 결국 **Bellman Equation의 변형이거나, 그것을 근사하는 방법**입니다.
+강화학습의 거의 모든 알고리즘은 결국 **Bellman Equation의 변형이거나, 그것을 근사하는 방법​**입니다.
 
 ---
 

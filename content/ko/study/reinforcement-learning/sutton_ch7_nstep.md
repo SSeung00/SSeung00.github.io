@@ -1,4 +1,4 @@
----
+﻿---
 title: "Reinforcement Learning: Chapter 7 n-step Bootstrapping"
 category: "Reinforcement Learning"
 weight: 7
@@ -28,7 +28,7 @@ date: 2026-04-09
 
 ### 복습: TD(0)와 MC의 target
 
-Chapter 6의 TD(0)는 **1-step 앞**만 보고 bootstrap합니다:
+Chapter 6의 TD(0)는 **1-step 앞​**만 보고 bootstrap합니다:
 
 $$\text{TD(0) target:} \quad G_t^{(1)} = R_{t+1} + \gamma V(S_{t+1})$$
 
@@ -36,7 +36,7 @@ Chapter 5의 MC는 **에피소드 끝까지** 실제 보상을 사용합니다:
 
 $$\text{MC target:} \quad G_t^{(\infty)} = R_{t+1} + \gamma R_{t+2} + \cdots + \gamma^{T-t-1} R_T$$
 
-**n-step TD**는 이 둘 사이 어딘가에 위치합니다. $n$ 스텝 앞까지 실제 보상을 사용하고, 그 이후는 추정값으로 bootstrap합니다:
+**n-step TD​**는 이 둘 사이 어딘가에 위치합니다. $n$ 스텝 앞까지 실제 보상을 사용하고, 그 이후는 추정값으로 bootstrap합니다:
 
 $$\text{n-step target:} \quad G_t^{(n)} = R_{t+1} + \gamma R_{t+2} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n V(S_{t+n})$$
 
@@ -83,7 +83,7 @@ $$= R_{t+1} + \gamma\, G_{t+1}^{(n-1)} \checkmark$$
 
 ### n-step Return의 오차 분석
 
-$V = v_\pi$라 가정하면, $n$-step return은 $v_\pi(S_t)$의 **unbiased estimate**입니다:
+$V = v_\pi$라 가정하면, $n$-step return은 $v_\pi(S_t)$의 **unbiased estimate​**입니다:
 
 $$\mathbb{E}_\pi\left[G_t^{(n)} \mid S_t\right] = v_\pi(S_t), \quad \text{if } V = v_\pi$$
 
@@ -173,7 +173,7 @@ $$G_t^{(n)} = R_{t+1} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n \sum_{a'} \pi(a
 
 ### n-step에서의 IS ratio
 
-Chapter 5의 off-policy MC에서 IS ratio는 전체 에피소드 궤적에 대해 계산했습니다. n-step에서는 **$n$ 스텝에 해당하는 구간**에만 적용합니다:
+Chapter 5의 off-policy MC에서 IS ratio는 전체 에피소드 궤적에 대해 계산했습니다. n-step에서는 **$n$ 스텝에 해당하는 구간​**에만 적용합니다:
 
 $$\rho_{t:t+n-1} \doteq \prod_{k=t}^{\min(t+n-1,\, T-1)} \frac{\pi(A_k \mid S_k)}{b(A_k \mid S_k)}$$
 
@@ -187,11 +187,11 @@ MC에서 IS ratio는 전체 에피소드 길이 $T$에 대한 곱이었습니다
 
 $$\rho_{t:T-1} = \prod_{k=t}^{T-1} \frac{\pi(A_k)}{b(A_k)}$$
 
-n-step에서는 **$n$ 개의 항**만 곱합니다:
+n-step에서는 **$n$ 개의 항​**만 곱합니다:
 
 $$\rho_{t:t+n-1} = \prod_{k=t}^{t+n-1} \frac{\pi(A_k)}{b(A_k)}$$
 
-$n \ll T$이면 IS ratio의 분산이 **극적으로 감소**합니다. 이것이 n-step off-policy TD가 MC off-policy보다 실용적인 핵심 이유입니다.
+$n \ll T$이면 IS ratio의 분산이 **극적으로 감소​**합니다. 이것이 n-step off-policy TD가 MC off-policy보다 실용적인 핵심 이유입니다.
 
 ### Off-policy n-step SARSA
 
@@ -205,11 +205,11 @@ $$Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha\,\rho_{t+1:t+n}\left[G_t^{(n)} - Q
 
 ### IS 없이 Off-policy를 달성하는 방법
 
-n-step IS는 분산을 줄였지만 여전히 남아 있습니다. **Tree Backup**은 IS ratio를 **전혀 사용하지 않고** off-policy n-step 업데이트를 수행합니다.
+n-step IS는 분산을 줄였지만 여전히 남아 있습니다. **Tree Backup​**은 IS ratio를 **전혀 사용하지 않고** off-policy n-step 업데이트를 수행합니다.
 
 ### 핵심 아이디어
 
-실제로 선택한 행동의 보상만 사용하되, **선택하지 않은 행동들의 기여도를 기댓값으로 처리**합니다.
+실제로 선택한 행동의 보상만 사용하되, **선택하지 않은 행동들의 기여도를 기댓값으로 처리​**합니다.
 
 1-step Tree Backup은 Expected SARSA와 동일합니다:
 
@@ -237,7 +237,7 @@ A_{t+1} 다른 행동들 ← π(a|S_{t+1})·Q(S_{t+1},a)로 즉시 처리
   ...
 ```
 
-실제로 선택된 행동 경로(가운데 줄기)를 따라가면서, 각 분기점에서 **선택되지 않은 가지들을 기댓값으로 즉시 처리(prune)**합니다.
+실제로 선택된 행동 경로(가운데 줄기)를 따라가면서, 각 분기점에서 **선택되지 않은 가지들을 기댓값으로 즉시 처리(prune)​**합니다.
 
 ---
 
@@ -245,7 +245,7 @@ A_{t+1} 다른 행동들 ← π(a|S_{t+1})·Q(S_{t+1},a)로 즉시 처리
 
 ### 네 가지 알고리즘의 통합
 
-Chapter 7의 핵심 통찰은 지금까지 나온 n-step 알고리즘들이 **하나의 파라미터 $\sigma$로 통합**된다는 점입니다.
+Chapter 7의 핵심 통찰은 지금까지 나온 n-step 알고리즘들이 **하나의 파라미터 $\sigma$로 통합​**된다는 점입니다.
 
 각 step $t$에서 **샘플링 여부를 결정하는 파라미터 $\sigma_t \in [0, 1]$**:
 
@@ -341,7 +341,7 @@ $$\underbrace{n=1}_{\substack{\text{High bias} \\ \text{Low variance} \\ \text{F
 | Ch.9~10 Function Approx. | 신경망으로 $V$, $Q$ 근사 | n-step return을 target으로 함수 근사 학습 |
 | Ch.12 Eligibility Traces | TD(λ) | n-step return의 기하급수 가중 평균 → λ로 통합 |
 
-특히 **Chapter 12의 TD(λ)**는 n-step return을 $\lambda$로 가중 평균하는 방법으로, Chapter 7이 그 직접적인 기반입니다:
+특히 **Chapter 12의 TD(λ)​**는 n-step return을 $\lambda$로 가중 평균하는 방법으로, Chapter 7이 그 직접적인 기반입니다:
 
 $$G_t^\lambda = (1-\lambda) \sum_{n=1}^{\infty} \lambda^{n-1} G_t^{(n)}$$
 
@@ -349,4 +349,4 @@ $$G_t^\lambda = (1-\lambda) \sum_{n=1}^{\infty} \lambda^{n-1} G_t^{(n)}$$
 
 ---
 
-> **다음 챕터로**: Chapter 8에서는 실제 환경 샘플 외에 **학습된 모델로 가상의 경험을 생성**하여 계획(planning)과 학습(learning)을 결합하는 **Dyna 아키텍처**를 다룹니다.
+> **다음 챕터로**: Chapter 8에서는 실제 환경 샘플 외에 **학습된 모델로 가상의 경험을 생성​**하여 계획(planning)과 학습(learning)을 결합하는 **Dyna 아키텍처​**를 다룹니다.
