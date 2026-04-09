@@ -1,29 +1,75 @@
 ---
 layout: default
 title: Study
+section: study
 permalink: /study.html
 ---
 
-<section class="page">
-  <h1 class="page-title">Study</h1>
-  <p class="page-intro">전공 공부 기록을 주제별로 정리합니다.</p>
+<div class="container">
+
+  <div class="page-hero">
+    <p class="page-eyebrow">📚 Study Notes</p>
+    <h1 class="page-title">Study</h1>
+    <p class="page-description">전공 공부 기록을 주제별로 정리합니다. 수업 노트, 논문 리뷰, 개념 정리 등.</p>
+  </div>
 
   {% if site.study and site.study.size > 0 %}
+
+    {% assign all_cats = site.study | map: "category" | uniq | compact | sort %}
+
+    <!-- Category filter tabs -->
+    <div class="filter-tabs" id="study-filter-tabs">
+      <button class="filter-tab active" data-filter="all">All</button>
+      {% for cat in all_cats %}
+        <button class="filter-tab" data-filter="{{ cat | slugify }}">{{ cat }}</button>
+      {% endfor %}
+    </div>
+
+    <!-- Posts grouped by category -->
     {% assign grouped = site.study | group_by: "category" %}
     {% for group in grouped %}
-      <div class="category-section">
-        <h2>{{ group.name }}</h2>
-        <ul class="post-list">
+      <div class="category-group" data-category="{{ group.name | slugify }}">
+        <p class="category-label">{{ group.name | default: "Uncategorized" }}</p>
+        <div class="post-cards">
           {% assign items = group.items | sort: "date" | reverse %}
           {% for post in items %}
-            <li>
-              <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
-            </li>
+            <a href="{{ post.url | relative_url }}" class="post-card">
+              <span class="post-card-title">{{ post.title }}</span>
+              <div class="post-card-meta">
+                <span class="post-card-date">{{ post.date | date: "%Y. %m. %d" }}</span>
+                {% if post.category %}
+                  <span class="tag">{{ post.category }}</span>
+                {% endif %}
+              </div>
+            </a>
           {% endfor %}
-        </ul>
+        </div>
       </div>
     {% endfor %}
+
   {% else %}
-    <p class="page-intro">아직 Study 글이 없습니다.</p>
+    <div class="empty-state">
+      <div class="empty-state-icon">📚</div>
+      <p>아직 Study 글이 없습니다.</p>
+    </div>
   {% endif %}
-</section>
+
+</div>
+
+<script>
+  const studyTabs   = document.querySelectorAll('#study-filter-tabs .filter-tab');
+  const studyGroups = document.querySelectorAll('.category-group');
+
+  studyTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      studyTabs.forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+
+      var filter = tab.dataset.filter;
+      studyGroups.forEach(function (group) {
+        group.style.display =
+          (filter === 'all' || group.dataset.category === filter) ? '' : 'none';
+      });
+    });
+  });
+</script>

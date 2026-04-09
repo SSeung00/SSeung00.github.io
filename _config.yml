@@ -23,13 +23,16 @@ defaults:
       type: study
     values:
       layout: post
+      section: study
   - scope:
       path: ""
       type: hobby
     values:
       layout: post
+      section: hobby
   - scope:
       path: ""
       type: journal
     values:
       layout: post
+      section: journal

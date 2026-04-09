@@ -2,18 +2,31 @@
 layout: default
 ---
 
-<article class="post">
-  <header class="post-header">
-    <h1 class="post-title">{{ page.title }}</h1>
-    <p class="post-meta">
-      <span>{{ page.date | date: "%Y-%m-%d" }}</span>
-      {% if page.category %}
-        · <span>{{ page.category }}</span>
-      {% endif %}
-    </p>
-  </header>
+<div class="container--narrow post-wrapper">
 
-  <div class="post-content">
-    {{ content }}
-  </div>
-</article>
+  <a href="javascript:history.back()" class="post-back">← 돌아가기</a>
+
+  <article>
+    <header class="post-header">
+      {% if page.category %}
+        <p class="post-eyebrow">{{ page.category }}</p>
+      {% elsif page.section %}
+        <p class="post-eyebrow">{{ page.section | capitalize }}</p>
+      {% endif %}
+
+      <h1 class="post-title">{{ page.title }}</h1>
+
+      <div class="post-meta-row">
+        <span class="post-date">{{ page.date | date: "%Y년 %m월 %d일" }}</span>
+        {% if page.category %}
+          <span class="tag">{{ page.category }}</span>
+        {% endif %}
+      </div>
+    </header>
+
+    <div class="post-content">
+      {{ content }}
+    </div>
+  </article>
+
+</div>
