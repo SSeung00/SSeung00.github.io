@@ -1,0 +1,31 @@
+{{ define "main" }}
+<div class="container">
+
+  <div class="page-hero">
+    <p class="page-eyebrow">{{ i18n "journal_eyebrow" }}</p>
+    <h1 class="page-title">{{ i18n "journal_title" }}</h1>
+    <p class="page-description">{{ i18n "journal_description" }}</p>
+  </div>
+
+  {{ $journalPages := .RegularPagesRecursive }}
+  {{ if $journalPages }}
+    <div class="post-cards">
+      {{ range $journalPages.ByDate.Reverse }}
+        <a href="{{ .Permalink }}" class="post-card">
+          <span class="post-card-title">{{ .Title }}</span>
+          <div class="post-card-meta">
+            <span class="post-card-date">{{ .Date.Format "2006. 01. 02" }}</span>
+            <span class="tag">{{ i18n "tag_journal" }}</span>
+          </div>
+        </a>
+      {{ end }}
+    </div>
+  {{ else }}
+    <div class="empty-state">
+      <div class="empty-state-icon">📝</div>
+      <p>{{ i18n "empty_journal" }}</p>
+    </div>
+  {{ end }}
+
+</div>
+{{ end }}

@@ -1,0 +1,42 @@
+<header class="site-header">
+  <div class="container header-inner">
+
+    <a class="site-logo" href="{{ .Site.Home.RelPermalink }}">{{ .Site.Params.logoText }}</a>
+
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="{{ .Site.Home.RelPermalink }}"
+        {{ if .IsHome }}class="nav-active"{{ end }}>{{ i18n "nav_home" }}</a>
+      <a href="{{ relLangURL "portfolio" }}"
+        {{ if eq (.Params.section | default .Section) "research" }}class="nav-active"{{ end }}>{{ i18n "nav_portfolio" }}</a>
+      <a href="{{ relLangURL "study" }}"
+        {{ if eq .Section "study" }}class="nav-active"{{ end }}>{{ i18n "nav_study" }}</a>
+      <a href="{{ relLangURL "hobby" }}"
+        {{ if eq .Section "hobby" }}class="nav-active"{{ end }}>{{ i18n "nav_hobby" }}</a>
+      <a href="{{ relLangURL "journal" }}"
+        {{ if eq .Section "journal" }}class="nav-active"{{ end }}>{{ i18n "nav_journal" }}</a>
+    </nav>
+
+    <div class="header-controls">
+      <!-- Language switcher -->
+      <div class="lang-switcher">
+        <span class="lang-btn lang-btn--active" lang="{{ .Site.Language.Lang }}">{{ .Site.Language.LanguageName }}</span>
+        {{ range .Translations }}
+          <a href="{{ .Permalink }}" class="lang-btn" lang="{{ .Language.Lang }}">{{ .Language.LanguageName }}</a>
+        {{ else }}
+          {{ $currentLang := .Site.Language.Lang }}
+          {{ range hugo.Sites }}
+            {{ if ne .Language.Lang $currentLang }}
+              <a href="{{ .Home.RelPermalink }}" class="lang-btn" lang="{{ .Language.Lang }}">{{ .Language.LanguageName }}</a>
+            {{ end }}
+          {{ end }}
+        {{ end }}
+      </div>
+
+      <button class="theme-toggle" id="theme-toggle"
+        aria-label="Toggle light/dark mode" title="Toggle theme">
+        ☀️
+      </button>
+    </div>
+
+  </div>
+</header>

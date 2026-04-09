@@ -1,0 +1,122 @@
+[nav_home]
+other = "Home"
+
+[nav_portfolio]
+other = "Portfolio"
+
+[nav_study]
+other = "Study"
+
+[nav_hobby]
+other = "Hobby"
+
+[nav_journal]
+other = "Journal"
+
+[study_eyebrow]
+other = "📚 Study Notes"
+
+[study_title]
+other = "Study"
+
+[study_description]
+other = "Study notes organized by topic. Lecture notes, paper reviews, concept summaries, and more."
+
+[hobby_eyebrow]
+other = "🏃 Hobby"
+
+[hobby_title]
+other = "Hobby"
+
+[hobby_description]
+other = "Running records, travel photos, and everyday moments."
+
+[journal_eyebrow]
+other = "📖 Journal"
+
+[journal_title]
+other = "Journal"
+
+[journal_description]
+other = "Daily life, thoughts, and things I've read."
+
+[filter_all]
+other = "All"
+
+[hobby_tab_running]
+other = "🏃 Running"
+
+[hobby_tab_travel]
+other = "✈️ Travel"
+
+[hobby_tab_etc]
+other = "📷 Etc"
+
+[empty_study]
+other = "No study notes yet."
+
+[empty_hobby]
+other = "No hobby posts yet."
+
+[empty_journal]
+other = "No journal entries yet."
+
+[recent_journal]
+other = "Recent Journal"
+
+[back_button]
+other = "← Back"
+
+[hero_eyebrow]
+other = "📍 Seoul National University"
+
+[hero_title_1]
+other = "Seung's"
+
+[hero_title_2]
+other = "Daily Capture"
+
+[hero_subtitle]
+other = "Ph.D. student in Structural Dynamics. Recording study notes, research, running, and travels."
+
+[hero_btn_portfolio]
+other = "Portfolio →"
+
+[hero_btn_study]
+other = "Study Notes"
+
+[card_study_title]
+other = "Study"
+
+[card_study_desc]
+other = "Notes on coursework, math, reinforcement learning, and more."
+
+[card_hobby_title]
+other = "Hobby"
+
+[card_hobby_desc]
+other = "Running records, travel photos, and everyday moments."
+
+[card_research_title]
+other = "Research"
+
+[card_research_desc]
+other = "Research activities in structural dynamics, control, and AI."
+
+[card_journal_title]
+other = "Journal"
+
+[card_journal_desc]
+other = "Daily life, thoughts, and things I've read."
+
+[rl_nav_title]
+other = "RL Table of Contents"
+
+[footer_copyright]
+other = "© %s Seung · All rights reserved."
+
+[tag_journal]
+other = "Journal"
+
+[uncategorized]
+other = "Uncategorized"

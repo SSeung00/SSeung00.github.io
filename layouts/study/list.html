@@ -1,0 +1,71 @@
+{{ define "main" }}
+<div class="container">
+
+  <div class="page-hero">
+    <p class="page-eyebrow">{{ i18n "study_eyebrow" }}</p>
+    <h1 class="page-title">{{ i18n "study_title" }}</h1>
+    <p class="page-description">{{ i18n "study_description" }}</p>
+  </div>
+
+  {{ $allPages := .RegularPagesRecursive }}
+  {{ if $allPages }}
+
+    {{ $grouped := $allPages.GroupByParam "category" }}
+
+    <!-- Category filter tabs -->
+    <div class="filter-tabs" id="study-filter-tabs">
+      <button class="filter-tab active" data-filter="all">{{ i18n "filter_all" }}</button>
+      {{ range $grouped }}
+        {{ if .Key }}
+          <button class="filter-tab" data-filter="{{ .Key | urlize }}">{{ .Key }}</button>
+        {{ end }}
+      {{ end }}
+    </div>
+
+    <!-- Posts grouped by category -->
+    {{ range $grouped }}
+      <div class="category-group" data-category="{{ .Key | urlize }}">
+        <p class="category-label">{{ if .Key }}{{ .Key }}{{ else }}{{ i18n "uncategorized" }}{{ end }}</p>
+        <div class="post-cards">
+          {{ range .Pages.ByWeight }}
+            <a href="{{ .Permalink }}" class="post-card">
+              <span class="post-card-title">{{ .Title }}</span>
+              <div class="post-card-meta">
+                <span class="post-card-date">{{ .Date.Format "2006. 01. 02" }}</span>
+                {{ with .Params.category }}
+                  <span class="tag">{{ . }}</span>
+                {{ end }}
+              </div>
+            </a>
+          {{ end }}
+        </div>
+      </div>
+    {{ end }}
+
+  {{ else }}
+    <div class="empty-state">
+      <div class="empty-state-icon">📚</div>
+      <p>{{ i18n "empty_study" }}</p>
+    </div>
+  {{ end }}
+
+</div>
+
+<script>
+  const studyTabs   = document.querySelectorAll('#study-filter-tabs .filter-tab');
+  const studyGroups = document.querySelectorAll('.category-group');
+
+  studyTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      studyTabs.forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+
+      var filter = tab.dataset.filter;
+      studyGroups.forEach(function (group) {
+        group.style.display =
+          (filter === 'all' || group.dataset.category === filter) ? '' : 'none';
+      });
+    });
+  });
+</script>
+{{ end }}

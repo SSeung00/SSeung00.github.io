@@ -1,0 +1,71 @@
+{{ define "main" }}
+<div class="container">
+
+  <div class="page-hero">
+    <p class="page-eyebrow">{{ i18n "hobby_eyebrow" }}</p>
+    <h1 class="page-title">{{ i18n "hobby_title" }}</h1>
+    <p class="page-description">{{ i18n "hobby_description" }}</p>
+  </div>
+
+  <!-- Sub-category tabs -->
+  <div class="hobby-tabs" id="hobby-tabs">
+    <button class="hobby-tab active" data-filter="all">{{ i18n "filter_all" }}</button>
+    <button class="hobby-tab" data-filter="running">{{ i18n "hobby_tab_running" }}</button>
+    <button class="hobby-tab" data-filter="travel">{{ i18n "hobby_tab_travel" }}</button>
+    <button class="hobby-tab" data-filter="etc">{{ i18n "hobby_tab_etc" }}</button>
+  </div>
+
+  {{ $hobbyPages := .RegularPagesRecursive }}
+  {{ if $hobbyPages }}
+    <div class="hobby-grid" id="hobby-grid">
+      {{ range $hobbyPages.ByDate.Reverse }}
+        <article class="hobby-card" data-subcategory="{{ .Params.subcategory | default "etc" }}">
+
+          <div class="hobby-card-img">
+            {{ with .Params.thumbnail }}
+              <img src="{{ . | relURL }}" alt="{{ $.Title }}" loading="lazy">
+            {{ else }}
+              {{ if eq .Params.subcategory "running" }}🏃
+              {{ else if eq .Params.subcategory "travel" }}✈️
+              {{ else }}📷
+              {{ end }}
+            {{ end }}
+          </div>
+
+          <div class="hobby-card-body">
+            <h2 class="hobby-card-title">
+              <a href="{{ .Permalink }}">{{ .Title }}</a>
+            </h2>
+            <p class="hobby-card-date">{{ .Date.Format "2006. 01. 02" }}</p>
+          </div>
+
+        </article>
+      {{ end }}
+    </div>
+  {{ else }}
+    <div class="empty-state">
+      <div class="empty-state-icon">📸</div>
+      <p>{{ i18n "empty_hobby" }}</p>
+    </div>
+  {{ end }}
+
+</div>
+
+<script>
+  var hobbyTabs  = document.querySelectorAll('#hobby-tabs .hobby-tab');
+  var hobbyCards = document.querySelectorAll('#hobby-grid .hobby-card');
+
+  hobbyTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      hobbyTabs.forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+
+      var filter = tab.dataset.filter;
+      hobbyCards.forEach(function (card) {
+        card.style.display =
+          (filter === 'all' || card.dataset.subcategory === filter) ? '' : 'none';
+      });
+    });
+  });
+</script>
+{{ end }}

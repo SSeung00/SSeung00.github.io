@@ -1,0 +1,12 @@
+{{ define "main" }}
+{{ if eq (.CurrentSection.Params.section_id | default "") "reinforcement-learning" }}
+  <div class="study-layout-with-nav">
+    {{ partial "rl-nav.html" . }}
+    <div class="study-main-content">
+      {{ partial "post-content.html" . }}
+    </div>
+  </div>
+{{ else }}
+  {{ partial "post-content.html" . }}
+{{ end }}
+{{ end }}
