@@ -1416,6 +1416,33 @@ pre code {
   border: none;
 }
 
+/* ── Simulator embed ─────────────────────────────────────────── */
+.simulator-embed {
+  margin: 2.2rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f1117;
+}
+.simulator-embed-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: #1a1d27;
+}
+.simulator-embed-icon { font-size: 0.85rem; }
+.simulator-embed iframe {
+  display: block;
+  width: 100%;
+  border: none;
+}
+
 /* ── Mermaid diagram centering ───────────────────────────────── */
 .mermaid {
   margin: 1.8rem 0;

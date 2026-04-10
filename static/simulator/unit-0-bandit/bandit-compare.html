@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bandit Algorithm Comparison</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-2: #252836;
+    --border: #2e3146;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --accent: #6c8ebf;
+    --accent-2: #bf8c6c;
+    --success: #6cbf8e;
+    --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+    --transition: 0.2s ease;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    padding: 12px 16px;
+    margin: 0;
+    min-height: 520px;
+  }
+
+  .controls-panel {
+    display: flex;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .control-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .control-label .param-name { font-family: var(--font-mono); color: var(--text); font-weight: 600; }
+  .control-label .param-value {
+    font-family: var(--font-mono); color: var(--accent);
+    background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 11px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; background: var(--border);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 14px; margin-bottom: 10px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+    min-height: 34px; display: flex; align-items: center;
+  }
+  .status-box.running { color: var(--accent-2); }
+  .status-box.done { color: var(--success); }
+
+  .chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+    position: relative; height: 280px;
+  }
+
+  .btn-row { display: flex; gap: 8px; justify-content: center; }
+  button {
+    padding: 8px 22px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text); font-family: var(--font-sans); font-size: 13px;
+    cursor: pointer; transition: var(--transition); font-weight: 500;
+  }
+  button:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 700; }
+  button.primary:hover { background: #8aadd4; border-color: #8aadd4; }
+  button.stop { border-color: var(--danger); color: var(--danger); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="controls-panel">
+  <div class="control-group">
+    <div class="control-label">
+      <span class="param-name">ε (epsilon)</span>
+      <span class="param-value" id="eps-val">0.10</span>
+    </div>
+    <input type="range" id="eps-slider" min="0" max="0.5" step="0.01" value="0.1">
+  </div>
+  <div class="control-group">
+    <div class="control-label">
+      <span class="param-name">c (UCB)</span>
+      <span class="param-value" id="ucb-val">2.0</span>
+    </div>
+    <input type="range" id="ucb-slider" min="0.5" max="3" step="0.1" value="2">
+  </div>
+  <div class="control-group">
+    <div class="control-label">
+      <span class="param-name">n_runs</span>
+      <span class="param-value" id="runs-val">20</span>
+    </div>
+    <input type="range" id="runs-slider" min="1" max="100" step="1" value="20">
+  </div>
+</div>
+
+<div class="status-box" id="status-box">
+  파라미터를 설정하고 ▶ 실행을 눌러 비교를 시작하세요.
+</div>
+
+<div class="chart-container">
+  <canvas id="mainChart"></canvas>
+</div>
+
+<div class="btn-row">
+  <button class="primary" id="run-btn">▶ 실행</button>
+  <button id="reset-btn">↺ 초기화</button>
+</div>
+
+<script>
+  Chart.defaults.color = '#8892a4';
+  Chart.defaults.borderColor = '#2e3146';
+
+  const STEPS = 1000, ARMS = 10, SEED_BASE = 42;
+  let chart = null, isRunning = false, shouldStop = false, autoRunTimeout = null;
+
+  const epsSlider  = document.getElementById('eps-slider');
+  const ucbSlider  = document.getElementById('ucb-slider');
+  const runsSlider = document.getElementById('runs-slider');
+
+  epsSlider.addEventListener('input',  () => { document.getElementById('eps-val').textContent  = parseFloat(epsSlider.value).toFixed(2); scheduleAutoRun(); });
+  ucbSlider.addEventListener('input',  () => { document.getElementById('ucb-val').textContent  = parseFloat(ucbSlider.value).toFixed(1); scheduleAutoRun(); });
+  runsSlider.addEventListener('input', () => { document.getElementById('runs-val').textContent = parseInt(runsSlider.value);              scheduleAutoRun(); });
+
+  function scheduleAutoRun() {
+    if (autoRunTimeout) clearTimeout(autoRunTimeout);
+    autoRunTimeout = setTimeout(() => {
+      if (chart && (chart.data.datasets[0].data.length > 0 || isRunning)) startSimulation();
+    }, 400);
+  }
+
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function boxMuller(rng) {
+    const u1 = rng(), u2 = rng();
+    return Math.sqrt(-2 * Math.log(u1 + 1e-12)) * Math.cos(2 * Math.PI * u2);
+  }
+
+  function generateTrueMeans(seed) {
+    const rng = mulberry32(seed);
+    return Array.from({ length: ARMS }, () => boxMuller(rng));
+  }
+
+  function runGreedy(trueMeans, seed) {
+    const rng = mulberry32(seed), Q = new Float64Array(ARMS), N = new Int32Array(ARMS), rewards = new Float64Array(STEPS);
+    for (let t = 0; t < STEPS; t++) {
+      let best = 0, bestQ = Q[0];
+      for (let a = 1; a < ARMS; a++) { if (Q[a] > bestQ) { bestQ = Q[a]; best = a; } }
+      const r = trueMeans[best] + boxMuller(rng);
+      N[best]++; Q[best] += (r - Q[best]) / N[best]; rewards[t] = r;
+    }
+    return rewards;
+  }
+
+  function runEpsGreedy(trueMeans, seed, eps) {
+    const rng = mulberry32(seed), Q = new Float64Array(ARMS), N = new Int32Array(ARMS), rewards = new Float64Array(STEPS);
+    for (let t = 0; t < STEPS; t++) {
+      let action;
+      if (rng() < eps) { action = Math.floor(rng() * ARMS); }
+      else { let best = 0, bestQ = Q[0]; for (let a = 1; a < ARMS; a++) { if (Q[a] > bestQ) { bestQ = Q[a]; best = a; } } action = best; }
+      const r = trueMeans[action] + boxMuller(rng);
+      N[action]++; Q[action] += (r - Q[action]) / N[action]; rewards[t] = r;
+    }
+    return rewards;
+  }
+
+  function runUCB(trueMeans, seed, c) {
+    const rng = mulberry32(seed), Q = new Float64Array(ARMS), N = new Int32Array(ARMS), rewards = new Float64Array(STEPS);
+    for (let t = 0; t < STEPS; t++) {
+      let action = -1;
+      for (let a = 0; a < ARMS; a++) { if (N[a] === 0) { action = a; break; } }
+      if (action === -1) {
+        let bestVal = -Infinity;
+        for (let a = 0; a < ARMS; a++) { const v = Q[a] + c * Math.sqrt(Math.log(t + 1) / N[a]); if (v > bestVal) { bestVal = v; action = a; } }
+      }
+      const r = trueMeans[action] + boxMuller(rng);
+      N[action]++; Q[action] += (r - Q[action]) / N[action]; rewards[t] = r;
+    }
+    return rewards;
+  }
+
+  function initChart() {
+    if (chart) chart.destroy();
+    const eps = parseFloat(epsSlider.value), c = parseFloat(ucbSlider.value);
+    chart = new Chart(document.getElementById('mainChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: STEPS }, (_, i) => i + 1),
+        datasets: [
+          { label: 'Greedy',                       data: [], borderColor: '#6c8ebf', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: `ε-greedy (ε=${eps.toFixed(2)})`, data: [], borderColor: '#bf8c6c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: `UCB (c=${c.toFixed(1)})`,       data: [], borderColor: '#6cbf8e', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'line', padding: 14, font: { size: 12 } } },
+          tooltip: { backgroundColor: '#1a1d27', borderColor: '#2e3146', borderWidth: 1,
+            callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}` } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Step', color: '#8892a4', font: { size: 11 } },
+               ticks: { maxTicksLimit: 11, color: '#8892a4', font: { size: 10 } }, grid: { color: '#2e3146' } },
+          y: { title: { display: true, text: 'Average Reward', color: '#8892a4', font: { size: 11 } },
+               ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: '#2e3146' } }
+        }
+      }
+    });
+  }
+
+  async function startSimulation() {
+    if (isRunning) { shouldStop = true; await new Promise(r => setTimeout(r, 60)); }
+    isRunning = true; shouldStop = false;
+
+    const eps = parseFloat(epsSlider.value), c = parseFloat(ucbSlider.value), nRuns = parseInt(runsSlider.value);
+    const runBtn = document.getElementById('run-btn'), resetBtn = document.getElementById('reset-btn');
+    const statusBox = document.getElementById('status-box');
+
+    runBtn.textContent = '⏸ 중지'; runBtn.className = 'stop'; resetBtn.disabled = true;
+
+    if (!chart) initChart();
+    chart.data.datasets[1].label = `ε-greedy (ε=${eps.toFixed(2)})`;
+    chart.data.datasets[2].label = `UCB (c=${c.toFixed(1)})`;
+
+    const trueMeans = generateTrueMeans(SEED_BASE);
+    const cumG = new Float64Array(STEPS), cumE = new Float64Array(STEPS), cumU = new Float64Array(STEPS);
+
+    for (let run = 0; run < nRuns; run++) {
+      if (shouldStop) break;
+      const seed = SEED_BASE + (run + 1) * 1000;
+      const rG = runGreedy(trueMeans, seed), rE = runEpsGreedy(trueMeans, seed + 1, eps), rU = runUCB(trueMeans, seed + 2, c);
+      for (let s = 0; s < STEPS; s++) { cumG[s] += rG[s]; cumE[s] += rE[s]; cumU[s] += rU[s]; }
+
+      const done = run + 1, factor = 1 / done;
+      const gF = cumG[STEPS-1]*factor, eF = cumE[STEPS-1]*factor, uF = cumU[STEPS-1]*factor;
+      const best = gF >= eF && gF >= uF ? 'Greedy' : eF >= uF ? `ε-greedy` : 'UCB';
+      const bestVal = Math.max(gF, eF, uF);
+
+      statusBox.className = 'status-box running';
+      statusBox.textContent = `실행 중: ${done} / ${nRuns} runs | 현재 최고: ${best} (step ${STEPS} 기준 ${bestVal.toFixed(3)})`;
+
+      const skip = Math.max(1, Math.floor(STEPS / 250));
+      const lbls = [], dG = [], dE = [], dU = [];
+      for (let s = 0; s < STEPS; s += skip) { lbls.push(s+1); dG.push(cumG[s]*factor); dE.push(cumE[s]*factor); dU.push(cumU[s]*factor); }
+      chart.data.labels = lbls;
+      chart.data.datasets[0].data = dG; chart.data.datasets[1].data = dE; chart.data.datasets[2].data = dU;
+      chart.update('none');
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    if (!shouldStop) {
+      const factor = 1 / nRuns;
+      const gF = cumG[STEPS-1]*factor, eF = cumE[STEPS-1]*factor, uF = cumU[STEPS-1]*factor;
+      const best = gF >= eF && gF >= uF ? 'Greedy' : eF >= uF ? `ε-greedy (ε=${eps.toFixed(2)})` : `UCB (c=${c.toFixed(1)})`;
+      statusBox.className = 'status-box done';
+      statusBox.textContent = `완료: ${nRuns} runs | 최고 알고리즘: ${best} (평균 보상 ${Math.max(gF,eF,uF).toFixed(4)})`;
+      runBtn.textContent = '▶ 다시 실행';
+    } else {
+      runBtn.textContent = '▶ 실행';
+    }
+    runBtn.className = 'primary'; resetBtn.disabled = false;
+    isRunning = false; shouldStop = false;
+  }
+
+  document.getElementById('run-btn').addEventListener('click', () => {
+    if (isRunning) { shouldStop = true; }
+    else { startSimulation(); }
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    shouldStop = true; isRunning = false;
+    if (autoRunTimeout) clearTimeout(autoRunTimeout);
+    document.getElementById('status-box').className = 'status-box';
+    document.getElementById('status-box').textContent = '파라미터를 설정하고 ▶ 실행을 눌러 비교를 시작하세요.';
+    document.getElementById('run-btn').textContent = '▶ 실행';
+    document.getElementById('run-btn').className = 'primary';
+    document.getElementById('reset-btn').disabled = false;
+    initChart();
+  });
+
+  initChart();
+</script>
+</body>
+</html>

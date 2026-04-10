@@ -1,0 +1,16 @@
+{{- $src    := .Get "src" -}}
+{{- $height := .Get "height" | default "520px" -}}
+{{- $title  := .Get "title" | default "Simulator" -}}
+<div class="simulator-embed">
+  <div class="simulator-embed-bar">
+    <span class="simulator-embed-icon">⚙</span>
+    <span class="simulator-embed-title">{{ $title }}</span>
+  </div>
+  <iframe
+    src="{{ $src }}"
+    style="height:{{ $height }}"
+    loading="lazy"
+    title="{{ $title }}"
+    allowtransparency="true"
+  ></iframe>
+</div>
