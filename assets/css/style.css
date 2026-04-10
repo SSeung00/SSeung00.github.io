@@ -1392,3 +1392,36 @@ pre code {
     display: none;
   }
 }
+
+/* ── Demo embed (iframe shortcode) ──────────────────────────── */
+.demo-embed {
+  margin: 2rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-alt);
+}
+.demo-embed-title {
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.demo-embed iframe {
+  display: block;
+  width: 100%;
+  border: none;
+}
+
+/* ── Mermaid diagram centering ───────────────────────────────── */
+.mermaid {
+  margin: 1.8rem 0;
+  text-align: center;
+}
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

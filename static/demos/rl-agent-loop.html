@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RL Agent-Environment Loop</title>
+<style>
+  :root {
+    --bg: #1a1612;
+    --surface: #252018;
+    --border: #3a3020;
+    --accent: #c9a84c;
+    --accent-dim: rgba(201,168,76,0.12);
+    --text: #e8dcc8;
+    --text-muted: #8a7a60;
+    --agent: #5b8fa8;
+    --env: #7a9e6e;
+    --reward: #c96a4c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Georgia', serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  h2 {
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+    font-weight: normal;
+  }
+
+  .diagram {
+    width: 100%;
+    max-width: 560px;
+    position: relative;
+  }
+
+  /* boxes */
+  .boxes {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .box {
+    flex: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 12px;
+    text-align: center;
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .box.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 18px rgba(201,168,76,0.2);
+  }
+  .box-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .box-name {
+    font-size: 1.05rem;
+    font-weight: bold;
+  }
+  .box.agent .box-name { color: var(--agent); }
+  .box.env   .box-name { color: var(--env); }
+
+  /* arrows area */
+  .arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+    min-width: 140px;
+  }
+
+  .arrow-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .arrow-row.down { flex-direction: row-reverse; }
+
+  .arrow-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: color 0.3s;
+    min-width: 80px;
+    text-align: center;
+  }
+  .arrow-label.active { color: var(--text); }
+  .arrow-label .sym {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .arrow-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    border-radius: 1px;
+    overflow: visible;
+    transition: background 0.3s;
+  }
+  .arrow-line.active { background: var(--accent); }
+
+  .arrow-line::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left: 8px solid var(--border);
+    transition: border-left-color 0.3s;
+  }
+  .arrow-row.down .arrow-line::after {
+    right: auto;
+    left: -1px;
+    border-left: none;
+    border-right: 8px solid var(--border);
+  }
+  .arrow-line.active::after { border-left-color: var(--accent); }
+  .arrow-row.down .arrow-line.active::after {
+    border-right-color: var(--accent);
+    border-left-color: transparent;
+  }
+
+  /* moving dot */
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: none;
+  }
+  .dot.action { animation: none; }
+  .dot.state  { animation: none; }
+
+  @keyframes moveRight {
+    0%   { left: 0%;  opacity: 1; }
+    90%  { left: 95%; opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+  }
+  @keyframes moveLeft {
+    0%   { right: 0%;  left: auto; opacity: 1; }
+    90%  { right: 95%; left: auto; opacity: 1; }
+    100% { right: 100%; left: auto; opacity: 0; }
+  }
+
+  /* timestep display */
+  .timestep {
+    margin-top: 28px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.8;
+  }
+  .timestep .highlight {
+    color: var(--text);
+    background: var(--accent-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+  .timestep .reward-val {
+    color: var(--reward);
+    font-weight: bold;
+  }
+
+  /* controls */
+  .controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 18px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); background: var(--accent-dim); }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+
+  .speed-label { font-size: 0.75rem; color: var(--text-muted); }
+  select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<h2>Agent – Environment Interaction Loop</h2>
+
+<div class="diagram">
+  <div class="boxes">
+    <div class="box agent" id="box-agent">
+      <div class="box-label">Policy π</div>
+      <div class="box-name">Agent</div>
+    </div>
+
+    <div class="arrows">
+      <!-- Action: Agent → Env -->
+      <div class="arrow-row" id="row-action">
+        <div class="arrow-label" id="lbl-action">
+          action<span class="sym" id="sym-action">A<sub>t</sub></span>
+        </div>
+        <div class="arrow-line" id="line-action">
+          <div class="dot" id="dot-action"></div>
+        </div>
+      </div>
+
+      <!-- State + Reward: Env → Agent -->
+      <div class="arrow-row down" id="row-state">
+        <div class="arrow-label" id="lbl-state">
+          state / reward<span class="sym" id="sym-state">S<sub>t+1</sub>, R<sub>t+1</sub></span>
+        </div>
+        <div class="arrow-line" id="line-state">
+          <div class="dot" id="dot-state"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box env" id="box-env">
+      <div class="box-label">Dynamics p</div>
+      <div class="box-name">Environment</div>
+    </div>
+  </div>
+
+  <div class="timestep" id="timestep-display">
+    Timestep <span class="highlight" id="ts-t">t = 0</span> &nbsp;|&nbsp;
+    State <span class="highlight" id="ts-s">S<sub>0</sub></span> &nbsp;|&nbsp;
+    Return <span class="highlight reward-val" id="ts-g">G = 0.00</span>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="primary" id="btn-play">▶ Play</button>
+  <button id="btn-step">Step</button>
+  <button id="btn-reset">Reset</button>
+  <span class="speed-label">Speed:</span>
+  <select id="speed-select">
+    <option value="1200">Slow</option>
+    <option value="700" selected>Normal</option>
+    <option value="350">Fast</option>
+  </select>
+</div>
+
+<script>
+  const PHASES = ['action', 'env', 'state', 'agent'];
+  let t = 0, G = 0, phase = 0, playing = false, timer = null;
+
+  const boxAgent   = document.getElementById('box-agent');
+  const boxEnv     = document.getElementById('box-env');
+  const lineAction = document.getElementById('line-action');
+  const lineState  = document.getElementById('line-state');
+  const lblAction  = document.getElementById('lbl-action');
+  const lblState   = document.getElementById('lbl-state');
+  const symAction  = document.getElementById('sym-action');
+  const symState   = document.getElementById('sym-state');
+  const dotAction  = document.getElementById('dot-action');
+  const dotState   = document.getElementById('dot-state');
+  const tsT        = document.getElementById('ts-t');
+  const tsS        = document.getElementById('ts-s');
+  const tsG        = document.getElementById('ts-g');
+  const btnPlay    = document.getElementById('btn-play');
+  const btnStep    = document.getElementById('btn-step');
+  const btnReset   = document.getElementById('btn-reset');
+  const speedSel   = document.getElementById('speed-select');
+
+  function getSpeed() { return parseInt(speedSel.value); }
+
+  function animateDot(dot, direction) {
+    dot.style.animation = 'none';
+    dot.offsetHeight; // reflow
+    const dur = getSpeed() * 0.55;
+    if (direction === 'right') {
+      dot.style.cssText = `animation: moveRight ${dur}ms linear forwards;`;
+    } else {
+      dot.style.cssText = `animation: moveLeft ${dur}ms linear forwards;`;
+    }
+  }
+
+  function clearActive() {
+    [boxAgent, boxEnv, lineAction, lineState, lblAction, lblState].forEach(
+      el => el.classList.remove('active')
+    );
+  }
+
+  function renderPhase(p) {
+    clearActive();
+    if (p === 0) {
+      // Agent deciding action
+      boxAgent.classList.add('active');
+      symAction.innerHTML = `A<sub>${t}</sub>`;
+      lblAction.classList.add('active');
+    } else if (p === 1) {
+      // Action travels to env
+      lineAction.classList.add('active');
+      animateDot(dotAction, 'right');
+    } else if (p === 2) {
+      // Env computing next state+reward
+      boxEnv.classList.add('active');
+      const r = (Math.random() * 2 - 0.5).toFixed(2);
+      dotAction.style.animation = 'none';
+      lineAction.classList.remove('active');
+      // store reward for display
+      renderPhase._r = r;
+      symState.innerHTML = `S<sub>${t+1}</sub>, R<sub>${t+1}</sub> = <b style="color:var(--reward)">${r}</b>`;
+      lblState.classList.add('active');
+    } else if (p === 3) {
+      // State travels back to agent
+      lineState.classList.add('active');
+      animateDot(dotState, 'left');
+      const r = parseFloat(renderPhase._r || 0);
+      G += r;
+      t += 1;
+      tsT.textContent = `t = ${t}`;
+      tsS.innerHTML   = `S<sub>${t}</sub>`;
+      tsG.textContent = `G = ${G.toFixed(2)}`;
+    }
+  }
+  renderPhase._r = '0.00';
+
+  function step() {
+    renderPhase(phase);
+    phase = (phase + 1) % 4;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    btnPlay.textContent = '⏸ Pause';
+    function tick() {
+      step();
+      timer = setTimeout(tick, getSpeed());
+    }
+    tick();
+  }
+
+  function pause() {
+    playing = false;
+    clearTimeout(timer);
+    btnPlay.textContent = '▶ Play';
+  }
+
+  function reset() {
+    pause();
+    t = 0; G = 0; phase = 0;
+    clearActive();
+    dotAction.style.animation = 'none';
+    dotState.style.animation = 'none';
+    symAction.innerHTML = `A<sub>t</sub>`;
+    symState.innerHTML  = `S<sub>t+1</sub>, R<sub>t+1</sub>`;
+    tsT.textContent = 't = 0';
+    tsS.innerHTML   = 'S<sub>0</sub>';
+    tsG.textContent = 'G = 0.00';
+  }
+
+  btnPlay.addEventListener('click', () => playing ? pause() : play());
+  btnStep.addEventListener('click', () => { pause(); step(); });
+  btnReset.addEventListener('click', reset);
+</script>
+</body>
+</html>

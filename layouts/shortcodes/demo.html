@@ -1,0 +1,14 @@
+{{- $src := .Get "src" -}}
+{{- $height := .Get "height" | default "420" -}}
+{{- $title := .Get "title" | default "Interactive Demo" -}}
+<div class="demo-embed">
+  <div class="demo-embed-title">{{ $title }}</div>
+  <iframe
+    src="{{ $src }}"
+    width="100%"
+    height="{{ $height }}"
+    frameborder="0"
+    loading="lazy"
+    title="{{ $title }}"
+  ></iframe>
+</div>
