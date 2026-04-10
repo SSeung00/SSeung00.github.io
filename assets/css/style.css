@@ -1417,8 +1417,13 @@ pre code {
 }
 
 /* ── Simulator embed ─────────────────────────────────────────── */
+/* Break out of container--narrow (780px) → full container (1040px) */
 .simulator-embed {
-  margin: 2.2rem 0;
+  width: min(1040px, 92vw);
+  margin-left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2.2rem;
+  margin-bottom: 2.2rem;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
