@@ -1,12 +1,14 @@
 {{- $src    := .Get "src" -}}
-{{- $height := .Get "height" | default "520px" -}}
+{{- $height := .Get "height" | default "400px" -}}
 {{- $title  := .Get "title" | default "Simulator" -}}
+{{- $id := printf "sim-%s" (md5 $src) -}}
 <div class="simulator-embed">
   <div class="simulator-embed-bar">
     <span class="simulator-embed-icon">⚙</span>
     <span class="simulator-embed-title">{{ $title }}</span>
   </div>
   <iframe
+    id="{{ $id }}"
     src="{{ $src }}"
     style="height:{{ $height }}"
     loading="lazy"
@@ -14,3 +16,22 @@
     allowtransparency="true"
   ></iframe>
 </div>
+<script>
+(function(){
+  var iframe = document.getElementById('{{ $id }}');
+  // 1) onload fallback — same-origin only
+  if(iframe) iframe.addEventListener('load', function(){
+    try {
+      var h = iframe.contentDocument.documentElement.scrollHeight;
+      if(h > 50) iframe.style.height = h + 'px';
+    } catch(e){}
+  });
+  // 2) postMessage from iframe (works cross-origin too)
+  window.addEventListener('message', function(e){
+    if(!e.data || e.data.type !== 'sim-resize') return;
+    if(iframe && iframe.contentWindow === e.source){
+      iframe.style.height = (e.data.h + 2) + 'px';
+    }
+  });
+})();
+</script>

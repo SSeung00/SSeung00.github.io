@@ -572,5 +572,12 @@
   // ── Init ────────────────────────────────────────────────────────────────
   renderHeatmap();
 </script>
+<script>
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
 </body>
 </html>
