@@ -6,199 +6,109 @@
 <title>Gridworld — Policy & Value</title>
 <style>
   :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface-2: #252836;
-    --border: #2e3146;
-    --text: #e2e8f0;
-    --text-muted: #8892a4;
-    --accent: #6c8ebf;
-    --accent-2: #bf8c6c;
-    --success: #6cbf8e;
-    --danger: #bf6c6c;
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
     --font-mono: 'Courier New', monospace;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --radius: 8px;
-    --transition: 0.2s ease;
-    --cell: 70px;
-    --gap: 5px;
+    --radius: 8px; --transition: 0.2s ease;
+    --cell: 60px; --gap: 5px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-sans);
-    font-size: 13px;
-    padding: 10px 14px;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 580px;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
   }
 
-  /* ── Status ───────────────────────────────────── */
+  /* ── Status ─────────────────────────────────── */
   .status-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 7px 12px;
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    min-height: 32px;
-    line-height: 1.5;
-    flex-shrink: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 7px 12px;
+    font-family: var(--font-mono); font-size: 0.76rem;
+    color: var(--text-muted); min-height: 30px; line-height: 1.5;
   }
   .status-box b { color: var(--accent); font-weight: normal; }
   .status-box.converged b { color: var(--success); }
   .status-box.hint { border-left: 3px solid var(--accent-2); color: var(--accent-2); }
 
-  /* ── Main row ─────────────────────────────────── */
-  .main-row {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    flex-shrink: 0;
-  }
-
-  /* ── Grid ─────────────────────────────────────── */
-  .grid-section { flex-shrink: 0; }
-  .grid-title {
-    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--text-muted); margin-bottom: 6px;
-  }
+  /* ── Grid centered ──────────────────────────── */
+  .grid-section { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .grid-title { font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted); align-self: flex-start; }
   .grid {
     display: grid;
     grid-template-columns: repeat(4, var(--cell));
     grid-template-rows:    repeat(4, var(--cell));
     gap: var(--gap);
   }
-
   .cell {
     width: var(--cell); height: var(--cell);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    position: relative;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); position: relative;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 2px;
-    transition: background 0.25s, border-color 0.15s;
-    overflow: hidden;
+    align-items: center; justify-content: center; gap: 1px;
+    transition: background 0.25s, border-color 0.15s; overflow: hidden;
   }
   .cell.flash { border-color: var(--accent) !important; }
-  .cell .coord {
-    position: absolute; top: 3px; left: 5px;
-    font-size: 0.58rem; color: #3a4560; font-family: var(--font-mono);
-    pointer-events: none;
-  }
-
-  /* Arrow button */
+  .cell .coord { position: absolute; top: 3px; left: 4px; font-size: 0.56rem; color: #3a4560; font-family: var(--font-mono); pointer-events: none; }
   .arrow-btn {
-    background: none; border: none;
-    font-size: 1.35rem; line-height: 1;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: color var(--transition), background var(--transition);
+    background: none; border: none; font-size: 1.25rem; line-height: 1;
+    color: var(--text-muted); cursor: pointer; padding: 2px 5px;
+    border-radius: 4px; transition: color var(--transition), background var(--transition);
   }
   .arrow-btn:hover { color: var(--accent); background: rgba(108,142,191,0.12); }
-  .arrow-btn.active { color: var(--accent); }
-
-  /* Value display */
   .cell-val {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    pointer-events: none;
-    transition: color 0.2s;
+    font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted);
+    pointer-events: none; transition: color 0.2s;
   }
   .cell-val.updated { color: var(--text); }
+  .cell.goal { background: rgba(108,191,142,0.12) !important; border-color: var(--success); }
+  .cell.goal .cell-label { font-size: 1.15rem; color: var(--success); font-weight: bold; }
+  .cell.goal .cell-sub { font-size: 0.6rem; color: var(--success); opacity: 0.7; }
 
-  /* Goal cell */
-  .cell.goal {
-    background: rgba(108,191,142,0.12) !important;
-    border-color: var(--success);
+  /* ── Params row ──────────────────────────────── */
+  .params-stats-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
   }
-  .cell.goal .cell-label {
-    font-size: 1.3rem; color: var(--success); font-weight: bold;
-  }
-  .cell.goal .cell-sub {
-    font-size: 0.62rem; color: var(--success); opacity: 0.7;
-  }
-
-  /* ── Side panel ───────────────────────────────── */
-  .side-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
   .param-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px 14px;
-  }
-  .param-row {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 6px;
-    font-size: 0.78rem;
-  }
-  .param-name { font-family: var(--font-mono); color: var(--text); }
-  .param-val {
-    font-family: var(--font-mono); color: var(--accent);
-    background: var(--surface-2); padding: 1px 7px; border-radius: 4px;
-    font-size: 0.78rem;
-  }
-  input[type=range] {
-    width: 100%; accent-color: var(--accent); cursor: pointer;
-    -webkit-appearance: none; height: 4px; background: var(--border);
-    border-radius: 2px; outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 14px; height: 14px;
-    border-radius: 50%; background: var(--accent); cursor: pointer;
-  }
-
-  .stats-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-  }
-  .stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 9px 11px;
-  }
-  .stat-label {
-    font-size: 0.65rem; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px;
-  }
-  .stat-val {
-    font-size: 1.25rem; font-family: var(--font-mono); color: var(--accent);
-  }
-  .stat-val.green { color: var(--success); }
-  .stat-val.orange { color: var(--accent-2); }
-
-  .legend-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 9px 12px;
-    font-size: 0.72rem; color: var(--text-muted); line-height: 1.8;
   }
-  .legend-card span { font-family: var(--font-mono); }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .param-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; font-size: 0.76rem; }
+  .param-name { font-family: var(--font-mono); color: var(--text); }
+  .param-val { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 0.76rem; }
+  input[type=range] {
+    width: 100%; accent-color: var(--accent); cursor: pointer;
+    -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--accent); cursor: pointer; }
 
-  /* ── Controls ─────────────────────────────────── */
-  .controls {
-    display: flex; align-items: center; gap: 6px;
-    flex-wrap: wrap; flex-shrink: 0;
+  .stats-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 10px;
   }
+  .stat-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 2px; }
+  .stat-val { font-size: 1.1rem; font-family: var(--font-mono); color: var(--accent); }
+  .stat-val.orange { color: var(--accent-2); }
+
+  /* ── Legend ──────────────────────────────────── */
+  .legend-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 12px;
+    font-size: 0.72rem; color: var(--text-muted); line-height: 1.8;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ── Controls ────────────────────────────────── */
+  .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   button {
     background: var(--surface-2); border: 1px solid var(--border);
-    color: var(--text); padding: 6px 13px;
-    border-radius: var(--radius); cursor: pointer;
-    font-family: var(--font-sans); font-size: 0.82rem;
+    color: var(--text); padding: 5px 12px; border-radius: var(--radius);
+    cursor: pointer; font-family: var(--font-sans); font-size: 0.8rem;
     transition: var(--transition); white-space: nowrap;
   }
   button:hover { border-color: var(--accent); color: var(--accent); }
@@ -206,7 +116,7 @@
   button.primary:hover { background: #8aadd4; }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
   button.success-btn { border-color: var(--success); color: var(--success); }
-  button.success-btn:hover { background: rgba(108,191,142,0.12); }
+  button.success-btn:hover { background: rgba(108,191,142,0.1); }
 </style>
 </head>
 <body>
@@ -215,320 +125,139 @@
   화살표를 클릭해서 Policy를 바꿔보세요. 바꾼 뒤 <b>이 Policy 평가하기</b>를 눌러 Value가 어떻게 변하는지 확인하세요.
 </div>
 
-<div class="main-row">
-  <!-- Grid -->
-  <div class="grid-section">
-    <div class="grid-title">Policy (클릭해서 방향 변경)</div>
-    <div class="grid" id="grid"></div>
+<div class="grid-section">
+  <div class="grid-title">Policy (클릭해서 방향 변경)</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="params-stats-row">
+  <div class="param-card">
+    <div class="param-row"><span class="param-name">γ (discount)</span><span class="param-val" id="gamma-val">0.90</span></div>
+    <input type="range" id="gamma-slider" min="0.1" max="0.99" step="0.01" value="0.9">
   </div>
-
-  <!-- Side -->
-  <div class="side-panel">
-    <div class="param-card">
-      <div class="param-row">
-        <span class="param-name">γ (discount)</span>
-        <span class="param-val" id="gamma-val">0.90</span>
-      </div>
-      <input type="range" id="gamma-slider" min="0.1" max="0.99" step="0.01" value="0.9">
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Sweeps</div>
-        <div class="stat-val" id="stat-sweep">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">최대 ΔV</div>
-        <div class="stat-val orange" id="stat-delta">—</div>
-      </div>
-    </div>
-
-    <div class="legend-card">
-      <div><span class="dot" style="background:rgba(108,191,142,0.5)"></span>Goal (V = 0)</div>
-      <div><span class="dot" style="background:rgba(191,108,108,0.5)"></span>V 낮음 (멀거나 나쁜 방향)</div>
-      <div><span class="dot" style="background:rgba(108,142,191,0.35)"></span>V 높음 (가까움)</div>
-      <div style="margin-top:6px; font-size:0.68rem;">
-        🖱 화살표 클릭 → 방향 전환<br>
-        V 값은 음수 (패널티 합산)
-      </div>
-    </div>
+  <div class="stats-mini">
+    <div class="stat-card"><div class="stat-label">Sweeps</div><div class="stat-val" id="stat-sweep">0</div></div>
+    <div class="stat-card"><div class="stat-label">최대 ΔV</div><div class="stat-val orange" id="stat-delta">—</div></div>
   </div>
 </div>
 
-<!-- Controls -->
+<div class="legend-card">
+  <div class="legend-item"><span class="dot" style="background:rgba(108,191,142,0.5)"></span>Goal (V=0)</div>
+  <div class="legend-item"><span class="dot" style="background:rgba(191,108,108,0.4)"></span>V 낮음 (멀거나 나쁜 방향)</div>
+  <div class="legend-item"><span class="dot" style="background:rgba(108,142,191,0.35)"></span>V 높음 (가까움)</div>
+  <div style="font-size:0.68rem; color:var(--text-muted)">🖱 화살표 클릭 → 방향 전환 &nbsp;|&nbsp; V 값은 음수(패널티 합산)</div>
+</div>
+
 <div class="controls">
   <button class="primary" id="btn-eval" onclick="startEval()">▶ 이 Policy 평가하기</button>
-  <button onclick="stepSweep()" id="btn-step">1 Sweep</button>
-  <button class="success-btn" onclick="runToConverge()" id="btn-converge">수렴까지 실행</button>
-  <button onclick="resetValues()" id="btn-reset-v">V 초기화</button>
+  <button id="btn-step" onclick="stepSweep()">1 Sweep</button>
+  <button class="success-btn" id="btn-converge" onclick="runToConverge()">수렴까지 실행</button>
+  <button id="btn-reset-v" onclick="resetValues()">V 초기화</button>
   <button onclick="resetAll()">↺ 전체 초기화</button>
 </div>
 
 <script>
-  /* ─── Config ───────────────────────────────────────────────── */
-  const ROWS = 4, COLS = 4, GOAL = [3,3];
-  const DIRS = [[-1,0],[0,1],[1,0],[0,-1]]; // up right down left
-  const ARROWS = ['↑','→','↓','←'];
-  const THETA = 0.001;
+  const ROWS=4,COLS=4,GOAL=[3,3];
+  const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];
+  const ARROWS=['↑','→','↓','←'];
+  const THETA=0.001;
+  let policy=[],values=[],gamma=0.9,sweepCount=0,isAnimating=false;
 
-  let policy = [], values = [], gamma = 0.9;
-  let sweepCount = 0, maxDelta = Infinity;
-  let isAnimating = false, animTimer = null;
+  function isGoal(r,c){return r===GOAL[0]&&c===GOAL[1];}
+  function getNext(r,c,dir){return[Math.max(0,Math.min(ROWS-1,r+DIRS[dir][0])),Math.max(0,Math.min(COLS-1,c+DIRS[dir][1]))];}
 
-  /* ─── Init ─────────────────────────────────────────────────── */
-  function initPolicy() {
-    policy = Array.from({length: ROWS}, (_, r) =>
-      Array.from({length: COLS}, (_, c) => {
-        if (r === GOAL[0] && c === GOAL[1]) return 1;
-        return c < GOAL[1] ? 1 : 2; // right first, then down
-      })
-    );
+  function initPolicy(){
+    policy=Array.from({length:ROWS},(_,r)=>Array.from({length:COLS},(_,c)=>{
+      if(isGoal(r,c))return 1;return c<COLS-1?1:2;
+    }));
+  }
+  function initValues(){values=Array.from({length:ROWS},()=>new Float64Array(COLS));sweepCount=0;
+    document.getElementById('stat-sweep').textContent='0';document.getElementById('stat-delta').textContent='—';}
+
+  function cyclePolicy(r,c){
+    if(isAnimating)return;policy[r][c]=(policy[r][c]+1)%4;
+    document.getElementById(`arrow-${r}-${c}`).textContent=ARROWS[policy[r][c]];
+    initValues();updateAllCells();setStatus('Policy가 바뀌었습니다. <b>이 Policy 평가하기</b>를 눌러 새 Value를 계산하세요.','hint');
   }
 
-  function initValues() {
-    values = Array.from({length: ROWS}, () => new Float64Array(COLS));
-    sweepCount = 0; maxDelta = Infinity;
-    document.getElementById('stat-sweep').textContent = '0';
-    document.getElementById('stat-delta').textContent = '—';
-  }
-
-  function isGoal(r, c) { return r === GOAL[0] && c === GOAL[1]; }
-
-  function getNext(r, c, dir) {
-    return [Math.max(0, Math.min(ROWS-1, r + DIRS[dir][0])),
-            Math.max(0, Math.min(COLS-1, c + DIRS[dir][1]))];
-  }
-
-  /* ─── DOM: build grid ──────────────────────────────────────── */
-  function buildGrid() {
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '';
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.id = `cell-${r}-${c}`;
-
-        const coord = document.createElement('div');
-        coord.className = 'coord';
-        coord.textContent = `${r},${c}`;
-        cell.appendChild(coord);
-
-        if (isGoal(r, c)) {
-          cell.classList.add('goal');
-          cell.innerHTML += '<span class="cell-label">G</span><span class="cell-sub">V = 0</span>';
-          cell.querySelector('.coord').textContent = '3,3';
-        } else {
-          const btn = document.createElement('button');
-          btn.className = 'arrow-btn';
-          btn.id = `arrow-${r}-${c}`;
-          btn.textContent = ARROWS[policy[r][c]];
-          btn.onclick = () => cyclePolicy(r, c);
-          cell.appendChild(btn);
-
-          const val = document.createElement('div');
-          val.className = 'cell-val';
-          val.id = `val-${r}-${c}`;
-          val.textContent = '0.0';
-          cell.appendChild(val);
-        }
-        grid.appendChild(cell);
-      }
+  function evalSweep(){
+    const newV=Array.from({length:ROWS},()=>new Float64Array(COLS));let maxDelta=0;
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(isGoal(r,c)){newV[r][c]=0;continue;}
+      const[nr,nc]=getNext(r,c,policy[r][c]);newV[r][c]=-1+gamma*values[nr][nc];
+      maxDelta=Math.max(maxDelta,Math.abs(newV[r][c]-values[r][c]));
     }
+    values=newV;sweepCount++;return maxDelta;
+  }
+
+  async function stepSweep(){
+    if(isAnimating)return;isAnimating=true;setButtons(false);
+    const delta=evalSweep();
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(!isGoal(r,c)){const cell=document.getElementById(`cell-${r}-${c}`);cell?.classList.add('flash');updateCellDisplay(r,c);}
+    }
+    await sleep(40);
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)document.getElementById(`cell-${r}-${c}`)?.classList.remove('flash');
     updateCellColors();
+    document.getElementById('stat-sweep').textContent=sweepCount;
+    document.getElementById('stat-delta').textContent=delta<0.0001?delta.toExponential(2):delta.toFixed(4);
+    if(delta<THETA)setStatus(`수렴 완료! (${sweepCount} sweeps, ΔV=${delta.toExponential(2)}) — Goal에서 가까울수록 Value가 높습니다.`,'converged');
+    else setStatus(`Sweep ${sweepCount} 완료 — 최대 ΔV: <b>${delta.toFixed(4)}</b>`);
+    isAnimating=false;setButtons(true);
   }
 
-  /* ─── Policy interaction ───────────────────────────────────── */
-  function cyclePolicy(r, c) {
-    if (isAnimating) return;
-    policy[r][c] = (policy[r][c] + 1) % 4;
-    document.getElementById(`arrow-${r}-${c}`).textContent = ARROWS[policy[r][c]];
-
-    // Reset values when policy changes to show they're stale
-    initValues();
-    updateAllCells();
-    setStatus('Policy가 바뀌었습니다. <b>이 Policy 평가하기</b>를 눌러 새 Value를 계산하세요.', 'hint');
+  async function runToConverge(){
+    if(isAnimating)return;isAnimating=true;setButtons(false);setStatus('수렴할 때까지 실행 중...');
+    let delta=Infinity,iters=0;
+    while(delta>=THETA&&iters<500){delta=evalSweep();iters++;if(iters%5===0){updateAllCells();updateCellColors();await sleep(0);}}
+    updateAllCells();updateCellColors();
+    document.getElementById('stat-sweep').textContent=sweepCount;
+    document.getElementById('stat-delta').textContent=delta.toExponential(2);
+    setStatus(`수렴 완료! (<b>${sweepCount}</b> sweeps, 최종 ΔV=${delta.toExponential(2)})`,'converged');
+    isAnimating=false;setButtons(true);
   }
 
-  /* ─── Bellman sweep ────────────────────────────────────────── */
-  function computeSweep() {
-    const newV = Array.from({length: ROWS}, () => new Float64Array(COLS));
-    let delta = 0;
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isGoal(r, c)) { newV[r][c] = 0; continue; }
-        const [nr, nc] = getNext(r, c, policy[r][c]);
-        newV[r][c] = -1 + gamma * values[nr][nc];
-        delta = Math.max(delta, Math.abs(newV[r][c] - values[r][c]));
-      }
-    }
-    values = newV;
-    sweepCount++;
-    maxDelta = delta;
-    return delta;
-  }
+  function startEval(){if(isAnimating)return;initValues();updateAllCells();updateCellColors();
+    setStatus('Bellman 반복 시작. <b>1 Sweep</b>으로 한 단계씩 보거나, <b>수렴까지 실행</b>으로 최종 결과 확인');}
+  function resetValues(){if(isAnimating)return;initValues();updateAllCells();updateCellColors();setStatus('Value를 0으로 초기화했습니다.','hint');}
+  function resetAll(){if(isAnimating)return;initPolicy();initValues();buildGrid();
+    setStatus('화살표를 클릭해서 Policy를 바꿔보세요. 바꾼 뒤 <b>이 Policy 평가하기</b>를 눌러 Value가 어떻게 변하는지 확인하세요.','hint');}
 
-  /* ─── Animated single sweep ────────────────────────────────── */
-  async function stepSweep() {
-    if (isAnimating) return;
-    isAnimating = true;
-    setButtons(false);
-
-    const delta = computeSweep();
-
-    // Flash cells one by one
-    const cells = [];
-    for (let r = 0; r < ROWS; r++)
-      for (let c = 0; c < COLS; c++)
-        if (!isGoal(r, c)) cells.push([r,c]);
-
-    for (const [r,c] of cells) {
-      const cell = document.getElementById(`cell-${r}-${c}`);
-      cell.classList.add('flash');
-      updateCellDisplay(r, c);
-      await sleep(60);
-      cell.classList.remove('flash');
-    }
-    updateCellColors();
-    updateStats(delta);
-
-    if (delta < THETA) {
-      setStatus(`수렴 완료! (${sweepCount} sweeps, ΔV = ${delta.toExponential(2)}) — Goal에서 가까울수록 높은 Value를 가집니다.`, 'converged');
-    } else {
-      setStatus(`Sweep ${sweepCount} 완료 — 최대 ΔV: <b>${delta.toFixed(4)}</b> &nbsp;|&nbsp; ΔV &lt; ${THETA} 가 되면 수렴합니다.`);
-    }
-
-    isAnimating = false;
-    setButtons(true);
-  }
-
-  /* ─── Run to convergence ───────────────────────────────────── */
-  async function runToConverge() {
-    if (isAnimating) return;
-    isAnimating = true;
-    setButtons(false);
-    setStatus('수렴할 때까지 실행 중...');
-
-    let delta = Infinity, iters = 0;
-    while (delta >= THETA && iters < 500) {
-      delta = computeSweep();
-      iters++;
-      if (iters % 5 === 0) {
-        updateAllCells();
-        updateCellColors();
-        updateStats(delta);
-        await sleep(0);
-      }
-    }
-    updateAllCells();
-    updateCellColors();
-    updateStats(delta);
-
-    setStatus(`수렴 완료! (<b>${sweepCount}</b> sweeps, 최종 ΔV = ${delta.toExponential(2)}) — Policy가 얼마나 좋은지 Value로 판단할 수 있습니다.`, 'converged');
-    isAnimating = false;
-    setButtons(true);
-  }
-
-  function startEval() {
-    if (isAnimating) return;
-    initValues();
-    updateAllCells();
-    updateCellColors();
-    setStatus('Bellman 반복 시작. <b>1 Sweep</b> 으로 한 단계씩 보거나, <b>수렴까지 실행</b>으로 최종 결과를 확인하세요.');
-  }
-
-  function resetValues() {
-    if (isAnimating) return;
-    initValues();
-    updateAllCells();
-    updateCellColors();
-    setStatus('Value를 0으로 초기화했습니다.', 'hint');
-  }
-
-  function resetAll() {
-    if (isAnimating) return;
-    initPolicy();
-    initValues();
-    buildGrid();
-    setStatus('화살표를 클릭해서 Policy를 바꿔보세요. 바꾼 뒤 <b>이 Policy 평가하기</b>를 눌러 Value가 어떻게 변하는지 확인하세요.', 'hint');
-  }
-
-  /* ─── DOM update ───────────────────────────────────────────── */
-  function updateCellDisplay(r, c) {
-    const el = document.getElementById(`val-${r}-${c}`);
-    if (!el) return;
-    const v = values[r][c];
-    el.textContent = v.toFixed(1);
-    el.className = 'cell-val' + (v !== 0 ? ' updated' : '');
-  }
-
-  function updateAllCells() {
-    for (let r = 0; r < ROWS; r++)
-      for (let c = 0; c < COLS; c++)
-        if (!isGoal(r, c)) updateCellDisplay(r, c);
-  }
-
-  function updateCellColors() {
-    // Find min value to normalize
-    let minV = 0;
-    for (let r = 0; r < ROWS; r++)
-      for (let c = 0; c < COLS; c++)
-        if (!isGoal(r, c)) minV = Math.min(minV, values[r][c]);
-
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isGoal(r, c)) continue;
-        const cell = document.getElementById(`cell-${r}-${c}`);
-        const v = values[r][c];
-        if (minV === 0 || v === 0) {
-          cell.style.background = '';
-          continue;
-        }
-        const ratio = v / minV; // 0 (best) to 1 (worst)
-        // ratio=0 → accent blue (good), ratio=1 → danger red (bad)
-        const r1 = Math.round(108 + (191-108)*ratio); // blue→red
-        const g1 = Math.round(142 + (108-142)*ratio);
-        const b1 = Math.round(191 + (108-191)*ratio);
-        cell.style.background = `rgba(${r1},${g1},${b1},0.22)`;
-      }
+  function buildGrid(){
+    const grid=document.getElementById('grid');grid.innerHTML='';
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      const cell=document.createElement('div');cell.className='cell';cell.id=`cell-${r}-${c}`;
+      const coord=document.createElement('div');coord.className='coord';coord.textContent=`${r},${c}`;cell.appendChild(coord);
+      if(isGoal(r,c)){cell.classList.add('goal');cell.innerHTML+='<span class="cell-label">G</span><span class="cell-sub">V=0</span>';cell.querySelector('.coord').textContent='3,3';}
+      else{const btn=document.createElement('button');btn.className='arrow-btn';btn.id=`arrow-${r}-${c}`;btn.textContent=ARROWS[policy[r][c]];btn.onclick=()=>cyclePolicy(r,c);cell.appendChild(btn);
+        const val=document.createElement('div');val.className='cell-val';val.id=`val-${r}-${c}`;val.textContent='0.0';cell.appendChild(val);}
+      grid.appendChild(cell);
     }
   }
 
-  function updateStats(delta) {
-    document.getElementById('stat-sweep').textContent = sweepCount;
-    document.getElementById('stat-delta').textContent = delta < 0.0001 ? delta.toExponential(2) : delta.toFixed(4);
-  }
-
-  function setStatus(html, cls = '') {
-    const el = document.getElementById('status');
-    el.innerHTML = html;
-    el.className = 'status-box' + (cls ? ' ' + cls : '');
-  }
-
-  function setButtons(enabled) {
-    ['btn-eval','btn-step','btn-converge','btn-reset-v'].forEach(id => {
-      document.getElementById(id).disabled = !enabled;
-    });
-  }
-
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  /* ─── Gamma slider ─────────────────────────────────────────── */
-  document.getElementById('gamma-slider').addEventListener('input', function() {
-    gamma = parseFloat(this.value);
-    document.getElementById('gamma-val').textContent = gamma.toFixed(2);
-    if (sweepCount > 0) {
-      initValues();
-      updateAllCells();
-      updateCellColors();
-      setStatus('γ가 바뀌었습니다. <b>이 Policy 평가하기</b>를 다시 눌러 Value를 재계산하세요.', 'hint');
+  function updateCellDisplay(r,c){const el=document.getElementById(`val-${r}-${c}`);if(!el)return;const v=values[r][c];el.textContent=v.toFixed(1);el.className='cell-val'+(v!==0?' updated':'');}
+  function updateAllCells(){for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(!isGoal(r,c))updateCellDisplay(r,c);}
+  function updateCellColors(){
+    let minV=0;
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(!isGoal(r,c))minV=Math.min(minV,values[r][c]);
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(isGoal(r,c))continue;const cell=document.getElementById(`cell-${r}-${c}`);const v=values[r][c];
+      if(minV===0){cell.style.background='';continue;}
+      const ratio=v/minV;const rr=Math.round(108+(191-108)*ratio),gg=Math.round(142+(108-142)*ratio),bb=Math.round(191+(108-191)*ratio);
+      cell.style.background=`rgba(${rr},${gg},${bb},0.22)`;
     }
+  }
+
+  function setStatus(html,cls=''){const el=document.getElementById('status');el.innerHTML=html;el.className='status-box'+(cls?' '+cls:'');}
+  function setButtons(en){['btn-eval','btn-step','btn-converge','btn-reset-v'].forEach(id=>document.getElementById(id).disabled=!en);}
+  function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+  document.getElementById('gamma-slider').addEventListener('input',function(){
+    gamma=parseFloat(this.value);document.getElementById('gamma-val').textContent=gamma.toFixed(2);
+    if(sweepCount>0){initValues();updateAllCells();updateCellColors();setStatus('γ가 바뀌었습니다. <b>이 Policy 평가하기</b>를 다시 누르세요.','hint');}
   });
 
-  /* ─── Boot ─────────────────────────────────────────────────── */
-  initPolicy();
-  initValues();
-  buildGrid();
+  initPolicy();initValues();buildGrid();
 </script>
 </body>
 </html>

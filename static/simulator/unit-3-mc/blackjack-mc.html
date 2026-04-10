@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blackjack: Monte Carlo Value Estimation</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px; --transition: 0.2s ease;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  h3 { font-size: 0.85rem; font-weight: 600; color: var(--text); letter-spacing: 0.04em; }
+  .desc { font-size: 0.74rem; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── Tabs ─────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 5px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface-2); color: var(--text-muted); cursor: pointer;
+    font-size: 0.8rem; transition: var(--transition); user-select: none;
+  }
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 700; }
+
+  /* ── Status ───────────────────────────────── */
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 7px 12px;
+    font-family: var(--font-mono); font-size: 0.76rem;
+    color: var(--text-muted); min-height: 30px; line-height: 1.5;
+  }
+  .status-box b { color: var(--accent); }
+  .status-box.running { border-left: 3px solid var(--accent); }
+  .status-box.done    { border-left: 3px solid var(--success); }
+  .status-box.done b  { color: var(--success); }
+
+  /* ── Controls ─────────────────────────────── */
+  .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  button {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 12px; border-radius: var(--radius); cursor: pointer;
+    font-family: var(--font-sans); font-size: 0.8rem; transition: var(--transition); white-space: nowrap;
+  }
+  button:hover  { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #0f1117; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #8aadd4; }
+  button.danger-btn { border-color: var(--danger); color: var(--danger); }
+  button.danger-btn:hover { background: rgba(191,108,108,0.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Episode slider ────────────────────────── */
+  .param-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 12px;
+  }
+  .param-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; font-size: 0.76rem; }
+  .param-name { font-family: var(--font-mono); color: var(--text); }
+  .param-val { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 8px; border-radius: 4px; font-size: 0.82rem; }
+  input[type=range] {
+    width: 100%; accent-color: var(--accent); cursor: pointer;
+    -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+
+  /* ── Heatmap ──────────────────────────────── */
+  .heatmap-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 12px;
+  }
+  .heatmap-title {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-muted); margin-bottom: 8px;
+  }
+  .heatmap-wrap {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  }
+  .heatmap-row { display: flex; align-items: center; gap: 2px; margin-bottom: 2px; }
+  .heatmap-axis-label {
+    font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);
+    text-align: right; min-width: 26px; padding-right: 4px;
+  }
+  .hm-cell {
+    width: 42px; height: 32px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.62rem; font-family: var(--font-mono);
+    color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(0,0,0,0.15);
+    transition: background 0.3s;
+    cursor: default;
+  }
+  .hm-cell:hover { border-color: var(--accent); }
+  .heatmap-x-labels { display: flex; gap: 2px; margin-left: 30px; }
+  .heatmap-x-label {
+    width: 42px; text-align: center;
+    font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);
+  }
+  .heatmap-x-axis-title {
+    text-align: center; font-size: 0.65rem; color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .legend-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.68rem; color: var(--text-muted);
+  }
+  .legend-bar {
+    width: 120px; height: 10px; border-radius: 5px;
+    background: linear-gradient(to right, #bf6c6c, #2a2d3a, #6cbf8e);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Stats row ────────────────────────────── */
+  .stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
+  .stat-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .stat-val { font-size: 1.0rem; font-family: var(--font-mono); color: var(--accent); }
+  .stat-val.green { color: var(--success); }
+
+  /* ── Chart ────────────────────────────────── */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px 4px; }
+  .chart-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .chart-card canvas { display: block; width: 100% !important; height: 130px !important; }
+</style>
+</head>
+<body>
+
+<h3>Monte Carlo 가치 추정 — Blackjack</h3>
+<div class="desc">
+  정책: 합계 ≥ 20이면 STICK (Sutton &amp; Barto 예제). 상태 (플레이어 합, 딜러 오픈, 에이스 여부) 의 가치함수를 First-Visit MC로 추정합니다.
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-ace"   onclick="switchTab(true)">에이스 사용</div>
+  <div class="tab"        id="tab-noace" onclick="switchTab(false)">에이스 미사용</div>
+</div>
+
+<div class="heatmap-card">
+  <div class="heatmap-title" id="hm-title">V(s) — 에이스 사용 (Usable Ace)</div>
+  <div class="heatmap-wrap" id="heatmap"></div>
+  <div class="heatmap-x-axis-title">딜러 오픈 카드 (Dealer Showing)</div>
+  <div class="legend-row">
+    <span>-1.0</span>
+    <div class="legend-bar"></div>
+    <span>+1.0</span>
+    <span style="margin-left:8px;color:var(--text-muted);font-size:0.65rem">셀 내부: V(s) 추정값</span>
+  </div>
+</div>
+
+<div class="param-card">
+  <div class="param-row">
+    <span class="param-name">목표 에피소드 수</span>
+    <span class="param-val" id="ep-val">10,000</span>
+  </div>
+  <input type="range" id="ep-slider" min="0" max="5" step="1" value="2">
+  <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text-muted);margin-top:3px;">
+    <span>1k</span><span>5k</span><span>10k</span><span>50k</span><span>100k</span><span>500k</span>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="primary" id="btn-run"   onclick="startMC()">실행</button>
+  <button class="danger-btn" id="btn-reset" onclick="resetAll()">↺ 리셋</button>
+</div>
+
+<div class="status-box" id="status">
+  <b>실행</b>을 눌러 Monte Carlo 추정을 시작하세요.
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">총 에피소드</div>
+    <div class="stat-val" id="stat-ep">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">수렴 상태</div>
+    <div class="stat-val green" id="stat-conv">—</div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-label">특정 상태 V(s) 수렴 추적</div>
+  <canvas id="convChart"></canvas>
+</div>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────────────
+  // player sums: 12..21 (10 values, index 0..9)
+  // dealer showing: 2..10, A=11 (10 values, index 0..9)
+  // usable ace: 0=no, 1=yes
+  const PLAYER_SUMS  = [12,13,14,15,16,17,18,19,20,21];
+  const DEALER_CARDS = [2,3,4,5,6,7,8,9,10,11]; // 11 = Ace
+  const EP_STEPS = [1000, 5000, 10000, 50000, 100000, 500000];
+
+  // V[ace][player_idx][dealer_idx]
+  let V_sum   = [
+    Array.from({length:10}, () => new Float64Array(10)),  // no ace
+    Array.from({length:10}, () => new Float64Array(10))   // usable ace
+  ];
+  let V_count = [
+    Array.from({length:10}, () => new Uint32Array(10)),
+    Array.from({length:10}, () => new Uint32Array(10))
+  ];
+  let V = [
+    Array.from({length:10}, () => new Float64Array(10)),
+    Array.from({length:10}, () => new Float64Array(10))
+  ];
+
+  let totalEpisodes = 0;
+  let targetEp = 10000;
+  let showAce = true;
+  let running = false;
+
+  // Convergence tracking: [ep, v20A_ace, v16_7_noace, v13_2_noace]
+  // State indices:
+  //   (20, dealerA=11, ace=1) => playerIdx=8, dealerIdx=9, ace=1
+  //   (16, dealer7=7, ace=0)  => playerIdx=4, dealerIdx=5, ace=0
+  //   (13, dealer2=2, ace=0)  => playerIdx=1, dealerIdx=0, ace=0
+  let convHistory = [];
+
+  // ── Blackjack Logic ────────────────────────────────────────────────────
+  function drawCard() {
+    // Returns value: 2-10, face=10, ace=11
+    const r = Math.floor(Math.random() * 13);
+    if (r === 0) return 11;          // Ace
+    if (r >= 10) return 10;          // J/Q/K
+    return r + 1;                    // 2..10
+  }
+
+  function computeSum(cards) {
+    let sum = 0, aces = 0;
+    for (const c of cards) {
+      sum += c;
+      if (c === 11) aces++;
+    }
+    while (sum > 21 && aces > 0) { sum -= 10; aces--; }
+    return sum;
+  }
+
+  function hasUsableAce(cards) {
+    let sum = 0, aces = 0;
+    for (const c of cards) { sum += c; if (c === 11) aces++; }
+    // Usable ace means at least one ace counted as 11 and sum <= 21
+    return aces > 0 && sum <= 21;
+  }
+
+  // Run one episode, return array of (playerSum, dealerShowing, usableAce, reward)
+  // Policy: stick on >= 20
+  function runEpisode() {
+    const playerCards = [drawCard(), drawCard()];
+    const dealerCards = [drawCard(), drawCard()];
+    const dealerShowing = dealerCards[0]; // first card
+
+    // Natural check
+    const pSum = computeSum(playerCards);
+    const dSum = computeSum(dealerCards);
+    if (pSum === 21 && playerCards.length === 2) {
+      const reward = dSum === 21 ? 0 : 1;
+      return { states: [], reward };
+    }
+
+    const states = [];
+
+    // Player's turn — record states
+    while (true) {
+      const s = computeSum(playerCards);
+      const ace = hasUsableAce(playerCards) ? 1 : 0;
+
+      // Only track states with player sum 12..21
+      if (s >= 12 && s <= 21) {
+        states.push([ace, s - 12, DEALER_CARDS.indexOf(dealerShowing)]);
+      }
+
+      if (s >= 20) break; // stick on 20 or 21
+      if (s > 21)  break; // already bust
+
+      playerCards.push(drawCard());
+    }
+
+    const playerFinal = computeSum(playerCards);
+    if (playerFinal > 21) {
+      return { states, reward: -1 };
+    }
+
+    // Dealer's turn (hit until >= 17)
+    while (computeSum(dealerCards) < 17) {
+      dealerCards.push(drawCard());
+    }
+    const dealerFinal = computeSum(dealerCards);
+
+    let reward;
+    if (dealerFinal > 21 || playerFinal > dealerFinal) reward = 1;
+    else if (playerFinal < dealerFinal) reward = -1;
+    else reward = 0;
+
+    return { states, reward };
+  }
+
+  // ── MC first-visit update ───────────────────────────────────────────────
+  function updateV(states, reward) {
+    const visited = new Set();
+    for (const [ace, pi, di] of states) {
+      if (di < 0) continue; // dealer card not in our list (shouldn't happen)
+      const key = `${ace},${pi},${di}`;
+      if (visited.has(key)) continue; // first-visit
+      visited.add(key);
+      V_sum[ace][pi][di]   += reward;
+      V_count[ace][pi][di] += 1;
+      V[ace][pi][di] = V_sum[ace][pi][di] / V_count[ace][pi][di];
+    }
+  }
+
+  // ── Main MC loop ─────────────────────────────────────────────────────────
+  async function startMC() {
+    if (running) return;
+    running = true;
+    setButtons(false);
+
+    const CHUNK = 200;
+    const target = targetEp;
+    const toRun = target; // always start fresh from reset
+
+    setStatus(`Monte Carlo 추정 실행 중... (목표: ${target.toLocaleString()} 에피소드)`, 'running');
+
+    let done = 0;
+    while (done < toRun) {
+      const batch = Math.min(CHUNK, toRun - done);
+      for (let i = 0; i < batch; i++) {
+        const { states, reward } = runEpisode();
+        updateV(states, reward);
+        totalEpisodes++;
+      }
+      done += batch;
+
+      // Record convergence snapshot every 500 episodes
+      if (done % 500 === 0 || done === toRun) {
+        convHistory.push({
+          ep: totalEpisodes,
+          v20A:  V[1][8][9],   // (20, Ace, usable)
+          v16_7: V[0][4][5],   // (16, 7, no ace)
+          v13_2: V[0][1][0]    // (13, 2, no ace)
+        });
+      }
+
+      // Update UI every 2000 episodes
+      if (done % 2000 === 0 || done === toRun) {
+        renderHeatmap();
+        updateStats();
+        updateChart();
+        setStatus(`진행 중... ${totalEpisodes.toLocaleString()} / ${target.toLocaleString()} 에피소드`, 'running');
+        await sleep(0);
+      }
+    }
+
+    renderHeatmap();
+    updateStats();
+    updateChart();
+    setStatus(`<b>완료!</b> ${totalEpisodes.toLocaleString()} 에피소드 추정 완료.`, 'done');
+    running = false;
+    setButtons(true);
+  }
+
+  function resetAll() {
+    if (running) return;
+    V_sum   = [Array.from({length:10}, () => new Float64Array(10)), Array.from({length:10}, () => new Float64Array(10))];
+    V_count = [Array.from({length:10}, () => new Uint32Array(10)),  Array.from({length:10}, () => new Uint32Array(10))];
+    V       = [Array.from({length:10}, () => new Float64Array(10)), Array.from({length:10}, () => new Float64Array(10))];
+    totalEpisodes = 0;
+    convHistory = [];
+    renderHeatmap();
+    updateStats();
+    convChart.data.labels = [];
+    convChart.data.datasets.forEach(ds => ds.data = []);
+    convChart.update();
+    setStatus('<b>실행</b>을 눌러 Monte Carlo 추정을 시작하세요.');
+  }
+
+  // ── Heatmap ────────────────────────────────────────────────────────────
+  function valueToColor(v) {
+    // v in [-1, 1]: red(-1) → dark(0) → green(+1)
+    if (v > 0) {
+      // dark → green
+      const t = v; // 0..1
+      const r = Math.round(26  + (108 - 26)  * t);
+      const g = Math.round(29  + (191 - 29)  * t);
+      const b = Math.round(39  + (142 - 39)  * t);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      // dark → red
+      const t = -v; // 0..1
+      const r = Math.round(26  + (191 - 26)  * t);
+      const g = Math.round(29  + (108 - 29)  * t);
+      const b = Math.round(39  + (108 - 39)  * t);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
+  function renderHeatmap() {
+    const ace = showAce ? 1 : 0;
+    const container = document.getElementById('heatmap');
+    container.innerHTML = '';
+
+    // X-axis labels (top)
+    const xLabels = document.createElement('div');
+    xLabels.className = 'heatmap-x-labels';
+    const dealerLabels = ['2','3','4','5','6','7','8','9','10','A'];
+    for (const l of dealerLabels) {
+      const span = document.createElement('div');
+      span.className = 'heatmap-x-label';
+      span.textContent = l;
+      xLabels.appendChild(span);
+    }
+    container.appendChild(xLabels);
+
+    // Rows: player sum from 21 (top) to 12 (bottom)
+    for (let pi = 9; pi >= 0; pi--) {
+      const row = document.createElement('div');
+      row.className = 'heatmap-row';
+
+      const axLabel = document.createElement('div');
+      axLabel.className = 'heatmap-axis-label';
+      axLabel.textContent = PLAYER_SUMS[pi];
+      row.appendChild(axLabel);
+
+      for (let di = 0; di < 10; di++) {
+        const cell = document.createElement('div');
+        cell.className = 'hm-cell';
+        const v = V[ace][pi][di];
+        const cnt = V_count[ace][pi][di];
+        cell.style.background = valueToColor(v);
+        cell.textContent = cnt > 0 ? v.toFixed(2) : '—';
+        cell.title = `플레이어:${PLAYER_SUMS[pi]}, 딜러:${dealerLabels[di]}, 에이스:${showAce?'있음':'없음'} → V=${v.toFixed(3)} (n=${cnt})`;
+        row.appendChild(cell);
+      }
+      container.appendChild(row);
+    }
+
+    // Y-axis label
+    const yTitle = document.createElement('div');
+    yTitle.style.cssText = 'font-size:0.65rem;color:var(--text-muted);writing-mode:horizontal-tb;margin-top:4px;margin-left:30px';
+    yTitle.textContent = '↑ 플레이어 합계 (Player Sum) ↑';
+    container.appendChild(yTitle);
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────
+  function switchTab(ace) {
+    showAce = ace;
+    document.getElementById('tab-ace').classList.toggle('active', ace);
+    document.getElementById('tab-noace').classList.toggle('active', !ace);
+    document.getElementById('hm-title').textContent = ace
+      ? 'V(s) — 에이스 사용 (Usable Ace)'
+      : 'V(s) — 에이스 미사용 (No Usable Ace)';
+    renderHeatmap();
+  }
+
+  // ── Stats ───────────────────────────────────────────────────────────────
+  function updateStats() {
+    document.getElementById('stat-ep').textContent = totalEpisodes.toLocaleString();
+    const maxSamples = Math.max(
+      ...V_count[0].map(row => Math.max(...Array.from(row))),
+      ...V_count[1].map(row => Math.max(...Array.from(row)))
+    );
+    let convText = '—';
+    if (maxSamples >= 10000) convText = '수렴 (양호)';
+    else if (maxSamples >= 1000) convText = '진행 중';
+    else if (maxSamples > 0) convText = '초기 단계';
+    document.getElementById('stat-conv').textContent = convText;
+  }
+
+  function setStatus(html, cls = '') {
+    const el = document.getElementById('status');
+    el.innerHTML = html;
+    el.className = 'status-box' + (cls ? ' ' + cls : '');
+  }
+
+  function setButtons(en) {
+    ['btn-run', 'btn-reset'].forEach(id => document.getElementById(id).disabled = !en);
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Episode slider ──────────────────────────────────────────────────────
+  document.getElementById('ep-slider').addEventListener('input', function () {
+    const idx = parseInt(this.value);
+    targetEp = EP_STEPS[idx];
+    document.getElementById('ep-val').textContent = targetEp.toLocaleString();
+  });
+
+  // ── Chart ───────────────────────────────────────────────────────────────
+  Chart.defaults.color = '#8892a4';
+  Chart.defaults.borderColor = '#2e3146';
+  const convChart = new Chart(document.getElementById('convChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'V(20, A, 에이스)',
+          data: [],
+          borderColor: '#6cbf8e',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5, pointRadius: 0, tension: 0.2
+        },
+        {
+          label: 'V(16, 7, 없음)',
+          data: [],
+          borderColor: '#6c8ebf',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5, pointRadius: 0, tension: 0.2
+        },
+        {
+          label: 'V(13, 2, 없음)',
+          data: [],
+          borderColor: '#bf8c6c',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5, pointRadius: 0, tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: false, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { font: { size: 9 }, boxWidth: 20, padding: 8 }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: '에피소드', color: '#8892a4', font: { size: 10 } },
+          grid: { color: '#2e3146' },
+          ticks: { font: { size: 9 }, maxTicksLimit: 6,
+            callback: (v, i, arr) => {
+              const val = convHistory[i]?.ep;
+              if (!val) return '';
+              return val >= 1000 ? (val/1000).toFixed(0) + 'k' : val;
+            }
+          }
+        },
+        y: {
+          min: -1, max: 1,
+          title: { display: true, text: 'V(s)', color: '#8892a4', font: { size: 10 } },
+          grid: { color: '#2e3146' },
+          ticks: { font: { size: 9 } }
+        }
+      }
+    }
+  });
+
+  function updateChart() {
+    const labels = convHistory.map((_, i) => i);
+    convChart.data.labels = labels;
+    convChart.data.datasets[0].data = convHistory.map(d => d.v20A);
+    convChart.data.datasets[1].data = convHistory.map(d => d.v16_7);
+    convChart.data.datasets[2].data = convHistory.map(d => d.v13_2);
+    convChart.update();
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────
+  renderHeatmap();
+</script>
+</body>
+</html>
