@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DQN: Experience Replay & Target Network</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px; --transition: 0.2s ease;
+    --cell: 58px; --gap: 4px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* ── Toggle row ─────────────────────────────── */
+  .toggle-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .toggle-btn {
+    padding: 5px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface-2); color: var(--text-muted); cursor: pointer;
+    font-size: 0.78rem; transition: var(--transition); user-select: none;
+  }
+  .toggle-btn:hover { border-color: var(--accent); color: var(--text); }
+  .toggle-btn.on  { background: rgba(108,191,142,0.18); border-color: var(--success); color: var(--success); font-weight: 600; }
+  .toggle-btn.off { background: rgba(191,108,108,0.12); border-color: var(--danger);  color: var(--danger); }
+  .toggle-sep { color: var(--border); font-size: 0.9rem; padding: 0 2px; }
+  .config-label { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); }
+
+  /* ── Status ────────────────────────────────── */
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 12px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--text-muted); line-height: 1.5;
+  }
+  .status-box b { color: var(--accent); }
+  .status-box.running { border-left: 3px solid var(--accent); }
+  .status-box.done    { border-left: 3px solid var(--success); }
+  .status-box.done b  { color: var(--success); }
+
+  /* ── Params ────────────────────────────────── */
+  .params-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .param-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; }
+  .param-top  { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; margin-bottom: 4px; }
+  .param-name { font-family: var(--font-mono); color: var(--text-muted); }
+  .param-val  { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 7px; border-radius: 4px; min-width: 36px; text-align: center; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+  /* ── Controls ──────────────────────────────── */
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); font-size: 0.8rem; transition: var(--transition); white-space: nowrap; }
+  button:hover  { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #0f1117; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #8aadd4; }
+  button.danger-btn { border-color: var(--danger); color: var(--danger); }
+  button.danger-btn:hover { background: rgba(191,108,108,0.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main layout ────────────────────────────── */
+  .main-area { display: flex; gap: 8px; }
+
+  /* ── Grid ──────────────────────────────────── */
+  .grid-wrap { flex-shrink: 0; }
+  .grid-title { font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+  .grid { display: grid; grid-template-columns: repeat(5, var(--cell)); grid-template-rows: repeat(4, var(--cell)); gap: var(--gap); }
+  .cell {
+    width: var(--cell); height: var(--cell);
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: background 0.2s, border-color 0.15s; overflow: hidden;
+  }
+  .cell.goal  { background: rgba(108,191,142,0.12); border-color: var(--success); }
+  .cell.hole  { background: rgba(191,108,108,0.10); border-color: #7a3a3e; }
+  .cell.agent { border-color: var(--accent-2); box-shadow: 0 0 8px rgba(191,140,108,0.4); }
+  .cell-label { font-size: 1.1rem; line-height: 1; }
+  .cell-sub   { font-size: 0.54rem; color: var(--text-muted); margin-top: 1px; }
+  .cell canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+  .cell-coord  { position: absolute; top:2px; left:4px; font-size:0.5rem; color:#3a4560; font-family: var(--font-mono); }
+
+  /* ── Right panel ───────────────────────────── */
+  .right-panel { flex:1; display:flex; flex-direction:column; gap:7px; min-width:0; }
+
+  /* ── Stats ─────────────────────────────────── */
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:7px 8px; }
+  .stat-label { font-size:0.6rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:2px; }
+  .stat-val { font-size:0.95rem; font-family:var(--font-mono); color:var(--accent); }
+  .stat-val.green  { color:var(--success); }
+  .stat-val.orange { color:var(--accent-2); }
+  .stat-val.red    { color:var(--danger); }
+
+  /* ── Charts ─────────────────────────────────── */
+  .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:7px 10px 4px; }
+  .chart-label { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:3px; }
+  .chart-card canvas { display:block; width:100% !important; height:108px !important; }
+
+  /* ── Replay buffer bar ──────────────────────── */
+  .buffer-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:7px 10px; }
+  .buffer-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .buffer-title { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; }
+  .buffer-count { font-size:0.72rem; font-family:var(--font-mono); color:var(--accent); }
+  .buffer-bar-wrap { height:12px; background:var(--surface-2); border-radius:4px; overflow:hidden; }
+  .buffer-bar { height:100%; background:linear-gradient(90deg,#6c8ebf,#6cbf8e); border-radius:4px; transition:width 0.3s; }
+  .buffer-samples { display:flex; gap:1px; margin-top:4px; flex-wrap:wrap; }
+  .buf-dot { width:5px; height:5px; border-radius:1px; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<!-- Toggle row: DQN components -->
+<div class="toggle-row">
+  <span class="config-label">DQN 구성 요소:</span>
+  <div class="toggle-btn on" id="btnReplay" onclick="toggleReplay()">💾 Experience Replay: ON</div>
+  <span class="toggle-sep">|</span>
+  <div class="toggle-btn on" id="btnTarget" onclick="toggleTarget()">🎯 Target Network: ON</div>
+  <span class="toggle-sep">|</span>
+  <span class="config-label">Target 갱신: 50 steps</span>
+  <span class="toggle-sep">|</span>
+  <span class="config-label">Batch: 32</span>
+</div>
+
+<!-- Status -->
+<div class="status-box" id="statusBox">준비. Experience Replay / Target Network를 켜고 끄며 학습 안정성 차이를 비교하세요.</div>
+
+<!-- Params -->
+<div class="params-row">
+  <div class="param-card">
+    <div class="param-top"><span class="param-name">α (학습률)</span><span class="param-val" id="alphaVal">0.01</span></div>
+    <input type="range" id="alphaSlider" min="1" max="50" step="1" value="1"
+      oninput="document.getElementById('alphaVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+  <div class="param-card">
+    <div class="param-top"><span class="param-name">γ (할인율)</span><span class="param-val" id="gammaVal">0.95</span></div>
+    <input type="range" id="gammaSlider" min="50" max="100" step="1" value="95"
+      oninput="document.getElementById('gammaVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+  <div class="param-card">
+    <div class="param-top"><span class="param-name">ε (탐험율)</span><span class="param-val" id="epsVal">0.20</span></div>
+    <input type="range" id="epsSlider" min="1" max="100" step="1" value="20"
+      oninput="document.getElementById('epsVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="primary" id="runBtn" onclick="toggleRun()">▶ 실행</button>
+  <button onclick="runNEp(1)">1 에피소드</button>
+  <button onclick="runNEp(10)">10 에피소드</button>
+  <button onclick="runNEp(100)">100 에피소드</button>
+  <button class="danger-btn" onclick="resetAll()">↺ 리셋</button>
+</div>
+
+<!-- Main area -->
+<div class="main-area">
+  <!-- Grid -->
+  <div class="grid-wrap">
+    <div class="grid-title">신경망 Q-값 시각화</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">에피소드</div><div class="stat-val" id="statEp">0</div></div>
+      <div class="stat-card"><div class="stat-label">학습 스텝</div><div class="stat-val orange" id="statSteps">0</div></div>
+      <div class="stat-card"><div class="stat-label">최근 20 보상</div><div class="stat-val" id="statAvg">—</div></div>
+      <div class="stat-card"><div class="stat-label">최근 Loss</div><div class="stat-val red" id="statLoss">—</div></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-label">TD Loss (이동 평균 50)</div>
+      <canvas id="lossChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-label">에피소드 보상 (이동 평균 20)</div>
+      <canvas id="rewardChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Replay buffer visualization -->
+<div class="buffer-card" id="bufferCard">
+  <div class="buffer-header">
+    <span class="buffer-title">Replay Buffer</span>
+    <span class="buffer-count" id="bufCount">0 / 500</span>
+  </div>
+  <div class="buffer-bar-wrap"><div class="buffer-bar" id="bufBar" style="width:0%"></div></div>
+  <div class="buffer-samples" id="bufSamples"></div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────────────────────────
+// Environment: 4×5 Gridworld
+// ──────────────────────────────────────────────────────────────────────────────
+const ROWS=4, COLS=5, NACT=4, NSTATE=ROWS*COLS;
+const START=[0,0], GOAL=[3,4];
+const HOLES=[[1,2],[2,3]];
+const ACTS=[[-1,0],[1,0],[0,-1],[0,1]];
+
+function isHole(r,c){return HOLES.some(([a,b])=>a===r&&b===c);}
+function isGoal(r,c){return r===GOAL[0]&&c===GOAL[1];}
+
+function envStep(r,c,a){
+  let nr=r+ACTS[a][0], nc=c+ACTS[a][1];
+  if(nr<0||nr>=ROWS||nc<0||nc>=COLS){nr=r;nc=c;}
+  if(isHole(nr,nc)) return{nr,nc,reward:-10,done:true};
+  if(isGoal(nr,nc)) return{nr,nc,reward:0,done:true};
+  return{nr,nc,reward:-1,done:false};
+}
+
+function stateVec(r,c){
+  const x=new Float32Array(NSTATE); x[r*COLS+c]=1; return x;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Neural Network (input=20, hidden=32, output=4)
+// ──────────────────────────────────────────────────────────────────────────────
+const H=32; // hidden size
+
+function xavier(n,m){
+  const a=new Float32Array(n*m), std=Math.sqrt(2/(n+m));
+  for(let k=0;k<a.length;k++) a[k]=(Math.random()*2-1)*std;
+  return a;
+}
+
+function makeNet(){
+  return{W1:xavier(NSTATE,H),b1:new Float32Array(H),W2:xavier(H,NACT),b2:new Float32Array(NACT)};
+}
+
+function fwd(net,x){
+  const h=new Float32Array(H);
+  for(let j=0;j<H;j++){
+    let s=net.b1[j];
+    for(let i=0;i<NSTATE;i++) s+=net.W1[i*H+j]*x[i];
+    h[j]=s>0?s:0;
+  }
+  const q=new Float32Array(NACT);
+  for(let k=0;k<NACT;k++){
+    let s=net.b2[k];
+    for(let j=0;j<H;j++) s+=net.W2[j*NACT+k]*h[j];
+    q[k]=s;
+  }
+  return{h,q};
+}
+
+function train1(net,x,a,tgt,alpha){
+  const{h,q}=fwd(net,x);
+  const delta=q[a]-tgt;
+  // W2, b2
+  for(let j=0;j<H;j++) net.W2[j*NACT+a]-=alpha*delta*h[j];
+  net.b2[a]-=alpha*delta;
+  // W1, b1
+  for(let j=0;j<H;j++){
+    const dh=delta*net.W2[j*NACT+a]*(h[j]>0?1:0);
+    if(!dh) continue;
+    for(let i=0;i<NSTATE;i++) if(x[i]) net.W1[i*H+j]-=alpha*dh*x[i];
+    net.b1[j]-=alpha*dh;
+  }
+  return delta*delta;
+}
+
+function copyNet(dst,src){
+  dst.W1.set(src.W1);dst.b1.set(src.b1);
+  dst.W2.set(src.W2);dst.b2.set(src.b2);
+}
+
+function argmax(arr){let b=0,bv=arr[0];for(let i=1;i<arr.length;i++)if(arr[i]>bv){bv=arr[i];b=i;}return b;}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// State
+// ──────────────────────────────────────────────────────────────────────────────
+let mainNet, targetNet;
+let buffer=[], BUFFER_SIZE=500, BATCH_SIZE=32;
+let totalEp=0, totalSteps=0, trainSteps=0;
+let rewardHist=[], lossHist=[];
+let useReplay=true, useTarget=true;
+let TARGET_UPDATE=50;
+let running=false, runHandle=null;
+
+function getAlpha(){return parseFloat(document.getElementById('alphaSlider').value)/100;}
+function getGamma(){return parseFloat(document.getElementById('gammaSlider').value)/100;}
+function getEps()  {return parseFloat(document.getElementById('epsSlider').value)/100;}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DQN Episode
+// ──────────────────────────────────────────────────────────────────────────────
+function runEpisode(){
+  const alpha=getAlpha(), gamma=getGamma(), eps=getEps();
+  let r=START[0], c=START[1];
+  let totalR=0, steps=0;
+  const MAX=300;
+
+  while(steps<MAX){
+    const x=stateVec(r,c);
+    const{q}=fwd(mainNet,x);
+    const a=Math.random()<eps?Math.floor(Math.random()*NACT):argmax(q);
+    const{nr,nc,reward,done}=envStep(r,c,a);
+    const xn=stateVec(nr,nc);
+    totalR+=reward; steps++; totalSteps++;
+
+    if(useReplay){
+      if(buffer.length>=BUFFER_SIZE) buffer.shift();
+      buffer.push({x,a,r:reward,xn,done});
+
+      if(buffer.length>=BATCH_SIZE){
+        let loss=0;
+        // sample random mini-batch
+        for(let k=0;k<BATCH_SIZE;k++){
+          const idx=Math.floor(Math.random()*buffer.length);
+          const{x:bx,a:ba,r:br,xn:bxn,done:bd}=buffer[idx];
+          const tn=useTarget?targetNet:mainNet;
+          const{q:qn}=fwd(tn,bxn);
+          const maxQ=bd?0:Math.max(...qn);
+          const tgt=br+gamma*maxQ;
+          loss+=train1(mainNet,bx,ba,tgt,alpha);
+        }
+        lossHist.push(loss/BATCH_SIZE);
+        trainSteps++;
+      }
+    } else {
+      // Online (no replay)
+      const tn=useTarget?targetNet:mainNet;
+      const{q:qn}=fwd(tn,xn);
+      const maxQ=done?0:Math.max(...qn);
+      const tgt=reward+gamma*maxQ;
+      const loss=train1(mainNet,x,a,tgt,alpha);
+      lossHist.push(loss);
+      trainSteps++;
+    }
+
+    // Target network update
+    if(useTarget && totalSteps%TARGET_UPDATE===0) copyNet(targetNet,mainNet);
+
+    r=nr; c=nc;
+    if(done) break;
+  }
+  totalEp++;
+  rewardHist.push(totalR);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Run loop
+// ──────────────────────────────────────────────────────────────────────────────
+const CHUNK=10;
+function runChunk(){
+  if(!running) return;
+  for(let i=0;i<CHUNK;i++) runEpisode();
+  updateUI();
+  runHandle=setTimeout(runChunk,0);
+}
+
+function runNEp(n){
+  for(let i=0;i<n;i++) runEpisode();
+  updateUI();
+}
+
+function toggleRun(){
+  if(running){
+    running=false; clearTimeout(runHandle);
+    document.getElementById('runBtn').textContent='▶ 실행';
+    document.getElementById('runBtn').classList.remove('primary');
+    setStatus(false);
+  } else {
+    running=true;
+    document.getElementById('runBtn').textContent='⏹ 정지';
+    document.getElementById('runBtn').classList.add('primary');
+    setStatus(true);
+    runChunk();
+  }
+}
+
+function setStatus(isRunning){
+  const box=document.getElementById('statusBox');
+  const replay=useReplay?'ON':'OFF', tgt=useTarget?'ON':'OFF';
+  if(isRunning){
+    box.innerHTML=`학습 중 — Replay: <b>${replay}</b> | Target: <b>${tgt}</b> | α=${getAlpha().toFixed(2)}, ε=${getEps().toFixed(2)}`;
+    box.className='status-box running';
+  } else {
+    box.innerHTML=`완료 — ${totalEp} 에피소드, ${trainSteps} 학습 스텝 | Replay: <b>${replay}</b> | Target: <b>${tgt}</b>`;
+    box.className='status-box done';
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UI update
+// ──────────────────────────────────────────────────────────────────────────────
+function updateUI(){
+  drawGrid();
+  updateStats();
+  updateCharts();
+  updateBuffer();
+}
+
+function updateStats(){
+  document.getElementById('statEp').textContent=totalEp.toLocaleString();
+  document.getElementById('statSteps').textContent=trainSteps.toLocaleString();
+  if(rewardHist.length>=5){
+    const n=Math.min(20,rewardHist.length);
+    const avg=(rewardHist.slice(-n).reduce((s,v)=>s+v,0)/n).toFixed(1);
+    const el=document.getElementById('statAvg');
+    el.textContent=avg;
+    el.className='stat-val '+(parseFloat(avg)>-20?'green':parseFloat(avg)>-60?'orange':'red');
+  }
+  if(lossHist.length>0){
+    const last=lossHist.slice(-10).reduce((s,v)=>s+v,0)/Math.min(10,lossHist.length);
+    document.getElementById('statLoss').textContent=last.toFixed(3);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Grid drawing
+// ──────────────────────────────────────────────────────────────────────────────
+function buildGrid(){
+  const g=document.getElementById('grid'); g.innerHTML='';
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const cell=document.createElement('div');
+    cell.className='cell';
+    if(isGoal(r,c)) cell.innerHTML='<span class="cell-label">🏁</span><span class="cell-sub">목표</span>';
+    else if(isHole(r,c)) cell.innerHTML='<span class="cell-label">⚠</span><span class="cell-sub">−10</span>';
+    else {
+      const coord=document.createElement('div'); coord.className='cell-coord'; coord.textContent=`${r},${c}`; cell.appendChild(coord);
+      const cv=document.createElement('canvas'); cv.width=58; cv.height=58; cell.appendChild(cv);
+    }
+    cell.id=`c${r}_${c}`;
+    g.appendChild(cell);
+  }
+}
+
+function drawGrid(){
+  let qMin=Infinity, qMax=-Infinity;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(isGoal(r,c)||isHole(r,c)) continue;
+    const{q}=fwd(mainNet,stateVec(r,c));
+    for(let a=0;a<NACT;a++){if(q[a]<qMin)qMin=q[a]; if(q[a]>qMax)qMax=q[a];}
+  }
+  const qRange=Math.max(1e-6,qMax-qMin);
+
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const cell=document.getElementById(`c${r}_${c}`);
+    if(!cell||isGoal(r,c)||isHole(r,c)) continue;
+    const cv=cell.querySelector('canvas'); if(!cv) continue;
+    const ctx=cv.getContext('2d'); const W=cv.width,H2=cv.height;
+    ctx.clearRect(0,0,W,H2);
+    const{q}=fwd(mainNet,stateVec(r,c));
+    const best=argmax(q);
+    const dirs=[{a:0,pts:[[0,0],[W,0],[W/2,H2/2]]},{a:1,pts:[[0,H2],[W,H2],[W/2,H2/2]]},{a:2,pts:[[0,0],[0,H2],[W/2,H2/2]]},{a:3,pts:[[W,0],[W,H2],[W/2,H2/2]]}];
+    for(const{a,pts} of dirs){
+      const norm=(q[a]-qMin)/qRange;
+      const alpha=a===best?0.15+0.6*norm:0.04+0.12*norm;
+      ctx.fillStyle=`rgba(108,142,191,${alpha})`;
+      ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); ctx.lineTo(pts[1][0],pts[1][1]); ctx.lineTo(pts[2][0],pts[2][1]); ctx.closePath(); ctx.fill();
+    }
+    // Arrow
+    const arrowPts=[[W/2,3,W/2,H2/2-3],[W/2,H2-3,W/2,H2/2+3],[3,H2/2,W/2-3,H2/2],[W-3,H2/2,W/2+3,H2/2]];
+    const[x1,y1,x2,y2]=arrowPts[best];
+    ctx.strokeStyle='rgba(108,142,191,0.9)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const ang=Math.atan2(y2-y1,x2-x1), hs=5;
+    ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-hs*Math.cos(ang-0.5),y2-hs*Math.sin(ang-0.5)); ctx.lineTo(x2-hs*Math.cos(ang+0.5),y2-hs*Math.sin(ang+0.5)); ctx.closePath();
+    ctx.fillStyle='rgba(108,142,191,0.9)'; ctx.fill();
+    // Q value text
+    ctx.fillStyle='rgba(226,232,240,0.5)'; ctx.font='bold 8px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(q[best].toFixed(1),W/2,H2/2);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Charts
+// ──────────────────────────────────────────────────────────────────────────────
+let lossChart, rewardChart;
+
+function initCharts(){
+  if(lossChart){lossChart.destroy();}
+  if(rewardChart){rewardChart.destroy();}
+
+  const baseOpts={animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:{display:true,ticks:{color:'#8892a4',font:{size:9},maxTicksLimit:5},grid:{color:'#2e3146'}},
+            y:{display:true,ticks:{color:'#8892a4',font:{size:9},maxTicksLimit:4},grid:{color:'#2e3146'}}}};
+
+  lossChart=new Chart(document.getElementById('lossChart').getContext('2d'),{
+    type:'line', data:{datasets:[{label:'Loss',data:[],borderColor:'#bf6c6c',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+      {label:'Raw',data:[],borderColor:'rgba(191,108,108,0.2)',borderWidth:1,pointRadius:0,fill:false}]},
+    options:{...baseOpts}});
+
+  rewardChart=new Chart(document.getElementById('rewardChart').getContext('2d'),{
+    type:'line', data:{datasets:[{label:'Avg',data:[],borderColor:'#6c8ebf',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+      {label:'Raw',data:[],borderColor:'rgba(108,142,191,0.2)',borderWidth:1,pointRadius:0,fill:false}]},
+    options:{...baseOpts}});
+}
+
+function updateCharts(){
+  // Loss chart
+  if(lossHist.length>1){
+    const MA=50, step=Math.max(1,Math.floor(lossHist.length/300));
+    const avgD=[], rawD=[];
+    for(let i=0;i<lossHist.length;i+=step){
+      rawD.push({x:i,y:lossHist[i]});
+      if(i>=MA-1){const sl=lossHist.slice(Math.max(0,i-MA+1),i+1); avgD.push({x:i,y:sl.reduce((s,v)=>s+v,0)/sl.length});}
+    }
+    lossChart.data.datasets[0].data=avgD;
+    lossChart.data.datasets[1].data=rawD;
+    lossChart.update('none');
+  }
+  // Reward chart
+  if(rewardHist.length>1){
+    const MA=20, step=Math.max(1,Math.floor(rewardHist.length/300));
+    const avgD=[], rawD=[];
+    for(let i=0;i<rewardHist.length;i+=step){
+      rawD.push({x:i,y:rewardHist[i]});
+      if(i>=MA-1){const sl=rewardHist.slice(Math.max(0,i-MA+1),i+1); avgD.push({x:i,y:sl.reduce((s,v)=>s+v,0)/sl.length});}
+    }
+    rewardChart.data.datasets[0].data=avgD;
+    rewardChart.data.datasets[1].data=rawD;
+    rewardChart.update('none');
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Buffer visualization
+// ──────────────────────────────────────────────────────────────────────────────
+const ACTION_COLORS=['#6c8ebf','#6cbf8e','#bf8c6c','#bf6c6c']; // up,down,left,right
+
+function updateBuffer(){
+  document.getElementById('bufCount').textContent=`${buffer.length} / ${BUFFER_SIZE}`;
+  document.getElementById('bufBar').style.width=`${(buffer.length/BUFFER_SIZE*100).toFixed(1)}%`;
+
+  const samples=document.getElementById('bufSamples');
+  samples.innerHTML='';
+  const show=Math.min(buffer.length,80);
+  const start=Math.max(0,buffer.length-show);
+  for(let i=start;i<buffer.length;i++){
+    const d=document.createElement('div');
+    d.className='buf-dot';
+    const{r,done}=buffer[i];
+    const opacity=done?(r<0?1:0.9):0.5;
+    d.style.background=done?(r<0?'#bf6c6c':'#6cbf8e'):ACTION_COLORS[buffer[i].a];
+    d.style.opacity=opacity;
+    d.title=`s=${Array.from(buffer[i].x).indexOf(1)}, a=${buffer[i].a}, r=${buffer[i].r}, done=${buffer[i].done}`;
+    samples.appendChild(d);
+  }
+
+  // Hide buffer card if replay is off
+  document.getElementById('bufferCard').style.opacity=useReplay?'1':'0.3';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Toggles
+// ──────────────────────────────────────────────────────────────────────────────
+function toggleReplay(){
+  useReplay=!useReplay;
+  const btn=document.getElementById('btnReplay');
+  btn.textContent=`💾 Experience Replay: ${useReplay?'ON':'OFF'}`;
+  btn.className='toggle-btn '+(useReplay?'on':'off');
+  resetAll();
+}
+
+function toggleTarget(){
+  useTarget=!useTarget;
+  const btn=document.getElementById('btnTarget');
+  btn.textContent=`🎯 Target Network: ${useTarget?'ON':'OFF'}`;
+  btn.className='toggle-btn '+(useTarget?'on':'off');
+  resetAll();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Reset
+// ──────────────────────────────────────────────────────────────────────────────
+function resetAll(){
+  running=false; clearTimeout(runHandle);
+  document.getElementById('runBtn').textContent='▶ 실행';
+  document.getElementById('runBtn').classList.remove('primary');
+  mainNet=makeNet(); targetNet=makeNet(); copyNet(targetNet,mainNet);
+  buffer=[]; totalEp=0; totalSteps=0; trainSteps=0;
+  rewardHist=[]; lossHist=[];
+  document.getElementById('statEp').textContent='0';
+  document.getElementById('statSteps').textContent='0';
+  document.getElementById('statAvg').textContent='—';
+  document.getElementById('statLoss').textContent='—';
+  document.getElementById('statusBox').textContent='리셋 완료. 구성 요소를 설정하고 실행하세요.';
+  document.getElementById('statusBox').className='status-box';
+  drawGrid(); initCharts(); updateBuffer();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────────────────────────────────────────
+mainNet=makeNet(); targetNet=makeNet(); copyNet(targetNet,mainNet);
+buildGrid(); drawGrid(); initCharts(); updateBuffer();
+
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
+</body>
+</html>
