@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TD: SARSA / Q-Learning</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px; --transition: 0.2s ease;
+    --cell: 64px; --gap: 4px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* ── Tabs ─────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; }
+  .tab { padding: 5px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: var(--transition); user-select: none; }
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 700; }
+
+  /* ── Status ────────────────────────────────── */
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 12px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--text-muted); line-height: 1.5;
+  }
+  .status-box b { color: var(--accent); font-weight: normal; }
+  .status-box.running { border-left: 3px solid var(--accent); }
+  .status-box.done    { border-left: 3px solid var(--success); }
+  .status-box.done b  { color: var(--success); }
+
+  /* ── Params ────────────────────────────────── */
+  .params-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .param-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; }
+  .param-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; margin-bottom: 4px; }
+  .param-name { font-family: var(--font-mono); color: var(--text-muted); }
+  .param-val  { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 7px; border-radius: 4px; min-width: 36px; text-align: center; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+  /* ── Controls ──────────────────────────────── */
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); font-size: 0.8rem; transition: var(--transition); white-space: nowrap; }
+  button:hover  { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #0f1117; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #8aadd4; }
+  button.danger-btn { border-color: var(--danger); color: var(--danger); }
+  button.danger-btn:hover { background: rgba(191,108,108,0.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main layout ────────────────────────────── */
+  .main-area { display: flex; gap: 8px; }
+
+  /* ── Grid ──────────────────────────────────── */
+  .grid-wrap { flex-shrink: 0; }
+  .grid-title { font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, var(--cell));
+    grid-template-rows: repeat(4, var(--cell));
+    gap: var(--gap);
+  }
+  .cell {
+    width: var(--cell); height: var(--cell);
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: background 0.25s, border-color 0.15s; overflow: hidden;
+  }
+  .cell.goal   { background: rgba(108,191,142,0.12); border-color: var(--success); }
+  .cell.hole   { background: rgba(191,108,108,0.10); border-color: #7a3a3e; }
+  .cell.agent  { border-color: var(--accent-2); box-shadow: 0 0 8px rgba(191,140,108,0.4); }
+  .cell.trail  { border-color: rgba(108,142,191,0.3); }
+
+  .cell-label { font-size: 1.1rem; line-height: 1; }
+  .cell-sub   { font-size: 0.55rem; color: var(--text-muted); margin-top: 1px; }
+
+  /* Q arrows canvas inside cell */
+  .cell canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  .cell-coord { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #3a4560; font-family: var(--font-mono); pointer-events: none; }
+
+  /* ── Right panel ───────────────────────────── */
+  .right-panel { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+
+  /* ── Stats ─────────────────────────────────── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 8px; }
+  .stat-label { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .stat-val { font-size: 1rem; font-family: var(--font-mono); color: var(--accent); }
+  .stat-val.green  { color: var(--success); }
+  .stat-val.orange { color: var(--accent-2); }
+  .stat-val.red    { color: var(--danger); }
+
+  /* ── Chart ─────────────────────────────────── */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px 4px; flex: 1; }
+  .chart-label { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .chart-card canvas { display: block; width: 100% !important; height: 130px !important; }
+
+  /* ── Legend ─────────────────────────────────── */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.68rem; color: var(--text-muted); }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" id="tabSarsa" onclick="switchAlgo('sarsa')">SARSA (On-policy)</div>
+  <div class="tab" id="tabQlearn" onclick="switchAlgo('qlearn')">Q-Learning (Off-policy)</div>
+</div>
+
+<!-- Status -->
+<div class="status-box" id="statusBox">준비. 알고리즘을 선택하고 실행 버튼을 눌러주세요.</div>
+
+<!-- Params -->
+<div class="params-row">
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">α (학습률)</span>
+      <span class="param-val" id="alphaVal">0.10</span>
+    </div>
+    <input type="range" id="alphaSlider" min="1" max="50" step="1" value="10"
+      oninput="document.getElementById('alphaVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">γ (할인율)</span>
+      <span class="param-val" id="gammaVal">0.95</span>
+    </div>
+    <input type="range" id="gammaSlider" min="50" max="100" step="1" value="95"
+      oninput="document.getElementById('gammaVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">ε (탐험율)</span>
+      <span class="param-val" id="epsVal">0.20</span>
+    </div>
+    <input type="range" id="epsSlider" min="1" max="100" step="1" value="20"
+      oninput="document.getElementById('epsVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="primary" id="runBtn" onclick="toggleRun()">▶ 실행</button>
+  <button id="step1Btn" onclick="runNEpisodes(1)">1 에피소드</button>
+  <button id="step10Btn" onclick="runNEpisodes(10)">10 에피소드</button>
+  <button id="step100Btn" onclick="runNEpisodes(100)">100 에피소드</button>
+  <button class="danger-btn" id="resetBtn" onclick="resetAll()">↺ 리셋</button>
+  <div style="flex:1"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#6cbf8e"></div> 목표(+0)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#bf6c6c55;border:1px solid #7a3a3e"></div> 구덩이(−10)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--surface-2);border:1px solid var(--border)"></div> 이동(−1)</div>
+  </div>
+</div>
+
+<!-- Main: Grid + Right panel -->
+<div class="main-area">
+  <div class="grid-wrap">
+    <div class="grid-title">Q-값 시각화 (화살표 = 탐욕 행동, 밝기 = Q값 크기)</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="right-panel">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">에피소드</div>
+        <div class="stat-val" id="statEp">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">최근 100 평균 보상</div>
+        <div class="stat-val orange" id="statAvg">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">최단 경로</div>
+        <div class="stat-val green" id="statBest">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">현재 ε</div>
+        <div class="stat-val" id="statEps">0.20</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-label">에피소드별 보상 (이동 평균 20)</div>
+      <canvas id="rewardChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── World Definition ────────────────────────────────────────────────────────
+// 4 rows × 5 cols
+const ROWS = 4, COLS = 5;
+const START = [0, 0];
+const GOAL  = [3, 4];
+// Holes: (1,2), (2,3)  → reward −10, episode ends
+const HOLES = [[1,2],[2,3]];
+
+function isHole(r,c){ return HOLES.some(([hr,hc])=>hr===r&&hc===c); }
+function isGoal(r,c){ return r===GOAL[0]&&c===GOAL[1]; }
+
+const ACTIONS = [[-1,0],[1,0],[0,-1],[0,1]]; // up,down,left,right
+const ARROWS  = ['↑','↓','←','→'];
+const NACT    = 4;
+
+// ── Q-table ─────────────────────────────────────────────────────────────────
+let Q; // Q[r][c][a]
+
+function initQ(){
+  Q = Array.from({length:ROWS},()=>
+    Array.from({length:COLS},()=>new Float64Array(NACT).fill(0)));
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let algo = 'sarsa';
+let totalEp = 0;
+let rewardHistory = [];
+let bestSteps = Infinity;
+let agentPos = [...START];
+let running = false, runHandle = null;
+let chart = null;
+
+// ── Epsilon (can decay) ──────────────────────────────────────────────────────
+function getEps(){
+  const base = parseFloat(document.getElementById('epsSlider').value)/100;
+  return base; // fixed ε for now (user controls)
+}
+function getAlpha(){ return parseFloat(document.getElementById('alphaSlider').value)/100; }
+function getGamma(){ return parseFloat(document.getElementById('gammaSlider').value)/100; }
+
+// ── ε-greedy action ──────────────────────────────────────────────────────────
+function chooseAction(r,c,eps){
+  if(Math.random()<eps){
+    return Math.floor(Math.random()*NACT);
+  }
+  return greedyAction(r,c);
+}
+function greedyAction(r,c){
+  const qs = Q[r][c];
+  let best=0, bestV=qs[0];
+  for(let a=1;a<NACT;a++) if(qs[a]>bestV){bestV=qs[a];best=a;}
+  return best;
+}
+
+// ── Step ─────────────────────────────────────────────────────────────────────
+function step(r,c,a){
+  let nr = r + ACTIONS[a][0];
+  let nc = c + ACTIONS[a][1];
+  if(nr<0||nr>=ROWS||nc<0||nc>=COLS){nr=r;nc=c;} // wall bounce
+  if(isHole(nr,nc)) return {nr,nc,reward:-10,done:true};
+  if(isGoal(nr,nc)) return {nr,nc,reward:0,done:true};
+  return {nr,nc,reward:-1,done:false};
+}
+
+// ── Run one episode ──────────────────────────────────────────────────────────
+function runEpisode(){
+  const alpha = getAlpha(), gamma = getGamma(), eps = getEps();
+  let r=START[0], c=START[1];
+  let a = chooseAction(r,c,eps);
+  let totalR=0, steps=0;
+  const MAX_STEPS=300;
+
+  while(steps<MAX_STEPS){
+    const {nr,nc,reward,done} = step(r,c,a);
+    totalR += reward; steps++;
+
+    if(algo==='sarsa'){
+      const na = chooseAction(nr,nc,eps);
+      const target = done ? reward : reward + gamma*Q[nr][nc][na];
+      Q[r][c][a] += alpha*(target - Q[r][c][a]);
+      r=nr; c=nc; a=na;
+    } else { // Q-learning
+      const maxQ = done ? 0 : Math.max(...Q[nr][nc]);
+      const target = reward + gamma*maxQ;
+      Q[r][c][a] += alpha*(target - Q[r][c][a]);
+      r=nr; c=nc;
+      if(!done) a = chooseAction(r,c,eps);
+    }
+    if(done) break;
+  }
+  totalEp++;
+  if(steps<bestSteps && totalR>-50) bestSteps=steps;
+  rewardHistory.push(totalR);
+}
+
+// ── Batch run ────────────────────────────────────────────────────────────────
+const CHUNK=20;
+let targetEp=0;
+
+function runNEpisodes(n){
+  for(let i=0;i<n;i++) runEpisode();
+  updateUI();
+}
+
+function runChunk(){
+  if(!running) return;
+  const todo = Math.min(CHUNK, targetEp - totalEp);
+  for(let i=0;i<todo;i++) runEpisode();
+  updateUI();
+  if(running) runHandle = setTimeout(runChunk,0);
+}
+
+function toggleRun(){
+  if(running){
+    running=false;
+    clearTimeout(runHandle);
+    document.getElementById('runBtn').textContent='▶ 실행';
+    document.getElementById('runBtn').classList.remove('primary');
+    document.getElementById('runBtn').style.borderColor='';
+    updateStatus(false);
+  } else {
+    running=true;
+    targetEp=totalEp+100000;
+    document.getElementById('runBtn').textContent='⏹ 정지';
+    document.getElementById('runBtn').classList.add('primary');
+    updateStatus(true);
+    runChunk();
+  }
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+function updateUI(){
+  drawGrid();
+  updateStats();
+  updateChart();
+}
+
+function updateStatus(isRunning){
+  const box=document.getElementById('statusBox');
+  const algoName = algo==='sarsa'?'SARSA':'Q-Learning';
+  if(isRunning){
+    box.textContent=`[${algoName}] 학습 중... α=${getAlpha().toFixed(2)}, γ=${getGamma().toFixed(2)}, ε=${getEps().toFixed(2)}`;
+    box.className='status-box running';
+  } else {
+    box.textContent=`[${algoName}] ${totalEp} 에피소드 완료.`;
+    box.className='status-box done';
+  }
+}
+
+function updateStats(){
+  document.getElementById('statEp').textContent=totalEp.toLocaleString();
+  document.getElementById('statEps').textContent=getEps().toFixed(2);
+  if(rewardHistory.length>=20){
+    const last20=rewardHistory.slice(-20);
+    const avg=(last20.reduce((s,v)=>s+v,0)/20).toFixed(1);
+    const el=document.getElementById('statAvg');
+    el.textContent=avg;
+    el.className='stat-val '+(parseFloat(avg)>-20?'green':parseFloat(avg)>-50?'orange':'red');
+  }
+  if(bestSteps<Infinity) document.getElementById('statBest').textContent=bestSteps+' steps';
+}
+
+// ── Grid Drawing ──────────────────────────────────────────────────────────────
+function buildGrid(){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(isGoal(r,c)){cell.classList.add('goal'); cell.innerHTML='<span class="cell-label">🏁</span><span class="cell-sub">목표</span>';}
+      else if(isHole(r,c)){cell.classList.add('hole'); cell.innerHTML='<span class="cell-label">⚠</span><span class="cell-sub">-10</span>';}
+      else {
+        const coord=document.createElement('div');
+        coord.className='cell-coord';
+        coord.textContent=`${r},${c}`;
+        cell.appendChild(coord);
+        const cv=document.createElement('canvas');
+        cv.width=64; cv.height=64;
+        cell.appendChild(cv);
+      }
+      cell.id=`cell-${r}-${c}`;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function drawGrid(){
+  // Find Q range for normalization
+  let qMin=Infinity, qMax=-Infinity;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(isGoal(r,c)||isHole(r,c)) continue;
+    for(let a=0;a<NACT;a++){const v=Q[r][c][a]; if(v<qMin)qMin=v; if(v>qMax)qMax=v;}
+  }
+  const qRange=Math.max(1e-6, qMax-qMin);
+
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=document.getElementById(`cell-${r}-${c}`);
+      if(!cell||isGoal(r,c)||isHole(r,c)) continue;
+
+      // Agent indicator
+      const isAgent=(r===agentPos[0]&&c===agentPos[1]);
+      cell.classList.toggle('agent',isAgent);
+
+      const cv=cell.querySelector('canvas');
+      if(!cv) continue;
+      const ctx=cv.getContext('2d');
+      const W=cv.width, H=cv.height;
+      ctx.clearRect(0,0,W,H);
+
+      const qs=Q[r][c];
+      const best=greedyAction(r,c);
+
+      // Draw 4 directional wedges, intensity ∝ Q normalized
+      const dirs=[
+        {a:0, pts:[[0,0],[W,0],[W/2,H/2]]},          // up
+        {a:1, pts:[[0,H],[W,H],[W/2,H/2]]},           // down
+        {a:2, pts:[[0,0],[0,H],[W/2,H/2]]},            // left
+        {a:3, pts:[[W,0],[W,H],[W/2,H/2]]},            // right
+      ];
+
+      for(const {a,pts} of dirs){
+        const norm=(qs[a]-qMin)/qRange; // 0..1
+        const isBest=(a===best);
+        // Color: best action bright accent, others muted
+        let alpha;
+        if(isBest){
+          alpha=0.15+0.6*norm;
+          ctx.fillStyle=`rgba(108,142,191,${alpha})`;
+        } else {
+          alpha=0.04+0.15*norm;
+          ctx.fillStyle=`rgba(108,142,191,${alpha})`;
+        }
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0],pts[0][1]);
+        ctx.lineTo(pts[1][0],pts[1][1]);
+        ctx.lineTo(pts[2][0],pts[2][1]);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Best action arrow
+      const arrowDir=[[W/2,4,W/2,H/2-4],[W/2,H-4,W/2,H/2+4],[4,H/2,W/2-4,H/2],[W-4,H/2,W/2+4,H/2]];
+      const [x1,y1,x2,y2]=arrowDir[best];
+      ctx.strokeStyle='rgba(108,142,191,0.9)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      // Arrowhead
+      const angle=Math.atan2(y2-y1,x2-x1);
+      const hs=5;
+      ctx.beginPath();
+      ctx.moveTo(x2,y2);
+      ctx.lineTo(x2-hs*Math.cos(angle-0.5),y2-hs*Math.sin(angle-0.5));
+      ctx.lineTo(x2-hs*Math.cos(angle+0.5),y2-hs*Math.sin(angle+0.5));
+      ctx.closePath();
+      ctx.fillStyle='rgba(108,142,191,0.9)';
+      ctx.fill();
+
+      // Q-value text for best action
+      ctx.fillStyle='rgba(226,232,240,0.55)';
+      ctx.font=`bold 9px monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(qs[best].toFixed(1),W/2,H/2);
+    }
+  }
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function initChart(){
+  const ctx=document.getElementById('rewardChart').getContext('2d');
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{
+      datasets:[{
+        label:'이동 평균 (20)',
+        data:[],
+        borderColor:'#6c8ebf',
+        borderWidth:1.5,
+        pointRadius:0,
+        tension:0.3,
+        fill:false,
+      },{
+        label:'원본 보상',
+        data:[],
+        borderColor:'rgba(108,142,191,0.18)',
+        borderWidth:1,
+        pointRadius:0,
+        tension:0,
+        fill:false,
+      }]
+    },
+    options:{
+      animation:false,
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{
+        x:{display:true,ticks:{color:'#8892a4',font:{size:9},maxTicksLimit:6},grid:{color:'#2e3146'}},
+        y:{display:true,ticks:{color:'#8892a4',font:{size:9},maxTicksLimit:4},grid:{color:'#2e3146'}}
+      }
+    }
+  });
+}
+
+function updateChart(){
+  if(!chart||rewardHistory.length<2) return;
+  // Subsample for perf
+  const raw=rewardHistory;
+  const W=20;
+  const avgData=[], rawData=[];
+  const step=Math.max(1,Math.floor(raw.length/300));
+  for(let i=0;i<raw.length;i+=step){
+    rawData.push({x:i,y:raw[i]});
+    if(i>=W-1){
+      const slice=raw.slice(Math.max(0,i-W+1),i+1);
+      const avg=slice.reduce((s,v)=>s+v,0)/slice.length;
+      avgData.push({x:i,y:avg});
+    }
+  }
+  chart.data.datasets[0].data=avgData;
+  chart.data.datasets[1].data=rawData;
+  chart.update('none');
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll(){
+  running=false;
+  clearTimeout(runHandle);
+  document.getElementById('runBtn').textContent='▶ 실행';
+  document.getElementById('runBtn').classList.remove('primary');
+  initQ();
+  totalEp=0; rewardHistory=[]; bestSteps=Infinity; agentPos=[...START];
+  document.getElementById('statEp').textContent='0';
+  document.getElementById('statAvg').textContent='—';
+  document.getElementById('statBest').textContent='—';
+  document.getElementById('statusBox').textContent='리셋 완료. 다시 실행하세요.';
+  document.getElementById('statusBox').className='status-box';
+  drawGrid(); initChart();
+}
+
+// ── Switch Algorithm ──────────────────────────────────────────────────────────
+function switchAlgo(a){
+  algo=a;
+  document.getElementById('tabSarsa').classList.toggle('active',a==='sarsa');
+  document.getElementById('tabQlearn').classList.toggle('active',a==='qlearn');
+  resetAll();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+initQ();
+buildGrid();
+drawGrid();
+initChart();
+
+// Auto-resize
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
+</body>
+</html>
