@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cliff Walking: SARSA vs Q-Learning</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px; --transition: 0.2s ease;
+    --cell-w: 55px; --cell-h: 55px; --gap: 3px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* ── Tabs ─────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tab { padding: 5px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: var(--transition); user-select: none; }
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 700; }
+  .tab.active-orange { background: var(--accent-2); border-color: var(--accent-2); color: #0f1117; font-weight: 700; }
+  .tab.active-both { background: var(--success); border-color: var(--success); color: #0f1117; font-weight: 700; }
+
+  /* ── Status ────────────────────────────────── */
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 12px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--text-muted); line-height: 1.5; border-left: 3px solid var(--border);
+  }
+  .status-box.running { border-left: 3px solid var(--accent); }
+  .status-box b { color: var(--accent); font-weight: normal; }
+
+  /* ── Params ────────────────────────────────── */
+  .params-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .param-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; }
+  .param-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; margin-bottom: 4px; }
+  .param-name { font-family: var(--font-mono); color: var(--text-muted); }
+  .param-val  { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 7px; border-radius: 4px; min-width: 36px; text-align: center; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+  /* ── Controls ──────────────────────────────── */
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); font-size: 0.8rem; transition: var(--transition); white-space: nowrap; }
+  button:hover  { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #0f1117; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #8aadd4; }
+  button.danger-btn { border-color: var(--danger); color: var(--danger); }
+  button.danger-btn:hover { background: rgba(191,108,108,0.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Grid ──────────────────────────────────── */
+  .grid-section { overflow-x: auto; }
+  .grid-label { font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; display: flex; gap: 12px; align-items: center; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, var(--cell-w));
+    grid-template-rows: repeat(4, var(--cell-h));
+    gap: var(--gap);
+    width: fit-content;
+  }
+  .cell {
+    width: var(--cell-w); height: var(--cell-h);
+    border: 1px solid var(--border); border-radius: 5px;
+    background: var(--surface); position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: background 0.15s; overflow: hidden; font-size: 0.6rem; color: var(--text-muted);
+    user-select: none;
+  }
+  .cell.cliff {
+    background: rgba(120, 30, 30, 0.55);
+    border-color: #7a3030;
+  }
+  .cell.cliff-label {
+    font-size: 1.1rem; color: #e05555; display: flex; flex-direction: column; gap: 1px;
+  }
+  .cell.start  { background: rgba(108,142,191,0.15); border-color: var(--accent); }
+  .cell.goal   { background: rgba(108,191,142,0.15); border-color: var(--success); }
+
+  /* path dots */
+  .path-dot {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .path-dot.sarsa  { background: rgba(108,142,191,0.85); box-shadow: 0 0 4px rgba(108,142,191,0.6); }
+  .path-dot.qlearn { background: rgba(191,140,108,0.85); box-shadow: 0 0 4px rgba(191,140,108,0.6); }
+
+  /* agent icon */
+  .agent-icon {
+    position: absolute; font-size: 1.1rem; pointer-events: none;
+    z-index: 5; line-height: 1;
+  }
+
+  /* policy arrow canvas */
+  .cell canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* ── Stats ─────────────────────────────────── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 8px; }
+  .stat-label { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .stat-val { font-size: 1rem; font-family: var(--font-mono); color: var(--accent); }
+  .stat-val.orange { color: var(--accent-2); }
+  .stat-val.green  { color: var(--success); }
+
+  /* ── Chart ─────────────────────────────────── */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px 4px; }
+  .chart-label { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .chart-card canvas { display: block; width: 100% !important; height: 150px !important; }
+
+  /* ── Legend ─────────────────────────────────── */
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; display: inline-block; }
+  .legend-item { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; color: var(--text-muted); }
+
+  /* ── Info banner ──────────────────────────── */
+  .info-banner {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 12px; font-size: 0.72rem; color: var(--text-muted); line-height: 1.6;
+  }
+  .info-banner strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" id="tabSarsa"  onclick="switchTab('sarsa')">SARSA (On-policy)</div>
+  <div class="tab"        id="tabQlearn" onclick="switchTab('qlearn')">Q-Learning (Off-policy)</div>
+  <div class="tab"        id="tabBoth"   onclick="switchTab('both')">둘 다 비교</div>
+</div>
+
+<!-- Status -->
+<div class="status-box" id="statusBox">준비. ▶ Run 버튼을 눌러 학습을 시작하세요.</div>
+
+<!-- Params -->
+<div class="params-row">
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">α (학습률)</span>
+      <span class="param-val" id="alphaVal">0.50</span>
+    </div>
+    <input type="range" id="alphaSlider" min="1" max="100" step="1" value="50"
+      oninput="document.getElementById('alphaVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">ε (탐험율)</span>
+      <span class="param-val" id="epsVal">0.10</span>
+    </div>
+    <input type="range" id="epsSlider" min="1" max="100" step="1" value="10"
+      oninput="document.getElementById('epsVal').textContent=(this.value/100).toFixed(2)">
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="primary" id="runBtn" onclick="toggleRun()">▶ Run</button>
+  <button id="ep1Btn"   onclick="runN(1)">1 ep</button>
+  <button id="ep10Btn"  onclick="runN(10)">10 ep</button>
+  <button id="ep100Btn" onclick="runN(100)">100 ep</button>
+  <button class="danger-btn" onclick="resetAll()">↺ Reset</button>
+</div>
+
+<!-- Grid -->
+<div class="grid-section">
+  <div class="grid-label">
+    <span>Cliff Walking (4 × 12)</span>
+    <span class="legend-item"><span class="legend-dot" style="background:rgba(108,142,191,0.85)"></span> SARSA 경로</span>
+    <span class="legend-item"><span class="legend-dot" style="background:rgba(191,140,108,0.85)"></span> Q-Learning 경로</span>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">에피소드</div>
+    <div class="stat-val" id="statEp">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">SARSA 최근 100 평균</div>
+    <div class="stat-val" id="statSarsa">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Q-Learning 최근 100 평균</div>
+    <div class="stat-val orange" id="statQlearn">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">현재 ε</div>
+    <div class="stat-val green" id="statEps">0.10</div>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="chart-card">
+  <div class="chart-label">
+    에피소드별 보상 (이동평균 50)
+    <span class="legend-item"><span class="legend-dot" style="background:#6c8ebf"></span> SARSA</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#bf8c6c"></span> Q-Learning</span>
+  </div>
+  <canvas id="rewardChart"></canvas>
+</div>
+
+<!-- Info -->
+<div class="info-banner" id="infoBanner">
+  <strong>핵심 결과 (Sutton &amp; Barto Example 6.6):</strong>
+  SARSA는 학습 중 ε-탐험 실수를 고려해 <strong style="color:var(--accent)">절벽에서 먼 안전 경로</strong>를 학습합니다.
+  Q-Learning은 이론적으로 최적이지만 탐험 중 절벽에 자주 빠져 <strong style="color:var(--accent-2)">학습 중 보상이 낮습니다</strong>.
+  충분히 학습되면 Q-Learning은 절벽 바로 위 경로를, SARSA는 더 안전한 위쪽 경로를 선택합니다.
+</div>
+
+<script>
+// ── Auto-resize ─────────────────────────────────────────────────────────────
+(function(){
+  function sendH(){ window.parent.postMessage({type:'sim-resize', h: document.documentElement.scrollHeight}, '*'); }
+  if(window.ResizeObserver){ new ResizeObserver(sendH).observe(document.documentElement); }
+  window.addEventListener('load', sendH); sendH();
+})();
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const ROWS = 4, COLS = 12;
+const START = [3, 0], GOAL = [3, 11];
+const ACTIONS = ['up','right','down','left'];  // 0=up,1=right,2=down,3=left
+const DR = [-1, 0, 1, 0];
+const DC = [ 0, 1, 0,-1];
+const MAX_STEPS = 500;
+const GAMMA = 1.0;
+const ARROW = ['↑','→','↓','←'];
+
+function isCliff(r, c){ return r === 3 && c >= 1 && c <= 10; }
+function isGoal(r, c) { return r === GOAL[0] && c === GOAL[1]; }
+function stateKey(r, c){ return r * COLS + c; }
+
+// ── State ────────────────────────────────────────────────────────────────────
+let currentTab = 'sarsa';
+let running = false;
+let runTimer = null;
+
+// Q-tables: indexed by [state][action]
+let QS = [], QL = [];  // SARSA, Q-Learning
+let rewardHistS = [], rewardHistQ = [];
+let pathS = [], pathQ = [];   // recent episode paths [{r,c}]
+let episodeCount = 0;
+
+function initQ(){
+  QS = []; QL = [];
+  for(let s = 0; s < ROWS * COLS; s++){
+    QS.push([0,0,0,0]);
+    QL.push([0,0,0,0]);
+  }
+}
+
+// ── ε-greedy ─────────────────────────────────────────────────────────────────
+function epsilonGreedy(Q, s, eps){
+  if(Math.random() < eps){
+    return Math.floor(Math.random() * 4);
+  }
+  const qs = Q[s];
+  let best = 0, bestVal = qs[0];
+  for(let a = 1; a < 4; a++) if(qs[a] > bestVal){ bestVal = qs[a]; best = a; }
+  return best;
+}
+function greedyAction(Q, s){
+  const qs = Q[s];
+  let best = 0;
+  for(let a = 1; a < 4; a++) if(qs[a] > qs[best]) best = a;
+  return best;
+}
+
+// ── Step environment ─────────────────────────────────────────────────────────
+function step(r, c, a){
+  let nr = r + DR[a], nc = c + DC[a];
+  // clamp to grid
+  if(nr < 0) nr = 0; if(nr >= ROWS) nr = ROWS-1;
+  if(nc < 0) nc = 0; if(nc >= COLS) nc = COLS-1;
+  if(isCliff(nr, nc)){
+    return { r: START[0], c: START[1], reward: -100, done: false, fell: true };
+  }
+  const done = isGoal(nr, nc);
+  return { r: nr, c: nc, reward: -1, done, fell: false };
+}
+
+// ── Run one SARSA episode ─────────────────────────────────────────────────────
+function runSarsaEpisode(eps, alpha){
+  let r = START[0], c = START[1];
+  const s0 = stateKey(r, c);
+  let a = epsilonGreedy(QS, s0, eps);
+  let totalR = 0;
+  const path = [{r, c}];
+  for(let t = 0; t < MAX_STEPS; t++){
+    const {r: nr, c: nc, reward, done} = step(r, c, a);
+    const s1 = stateKey(nr, nc);
+    const a1 = epsilonGreedy(QS, s1, eps);  // on-policy: use ε-greedy next action
+    const s = stateKey(r, c);
+    QS[s][a] += alpha * (reward + GAMMA * QS[s1][a1] - QS[s][a]);
+    totalR += reward;
+    r = nr; c = nc; a = a1;
+    path.push({r, c});
+    if(done) break;
+  }
+  return {totalR, path};
+}
+
+// ── Run one Q-Learning episode ────────────────────────────────────────────────
+function runQLearnEpisode(eps, alpha){
+  let r = START[0], c = START[1];
+  let totalR = 0;
+  const path = [{r, c}];
+  for(let t = 0; t < MAX_STEPS; t++){
+    const s = stateKey(r, c);
+    const a = epsilonGreedy(QL, s, eps);
+    const {r: nr, c: nc, reward, done} = step(r, c, a);
+    const s1 = stateKey(nr, nc);
+    // off-policy: use max Q for next state
+    const maxQ1 = Math.max(...QL[s1]);
+    QL[s][a] += alpha * (reward + GAMMA * maxQ1 - QL[s][a]);
+    totalR += reward;
+    r = nr; c = nc;
+    path.push({r, c});
+    if(done) break;
+  }
+  return {totalR, path};
+}
+
+// ── Run N episodes ────────────────────────────────────────────────────────────
+function runN(n){
+  const eps   = parseFloat(document.getElementById('epsSlider').value) / 100;
+  const alpha = parseFloat(document.getElementById('alphaSlider').value) / 100;
+  for(let i = 0; i < n; i++){
+    episodeCount++;
+    if(currentTab === 'sarsa' || currentTab === 'both'){
+      const res = runSarsaEpisode(eps, alpha);
+      rewardHistS.push(res.totalR);
+      pathS = res.path;
+    }
+    if(currentTab === 'qlearn' || currentTab === 'both'){
+      const res = runQLearnEpisode(eps, alpha);
+      rewardHistQ.push(res.totalR);
+      pathQ = res.path;
+    }
+  }
+  render();
+}
+
+// ── Toggle continuous run ─────────────────────────────────────────────────────
+function toggleRun(){
+  running = !running;
+  const btn = document.getElementById('runBtn');
+  if(running){
+    btn.textContent = '⏸ Pause';
+    btn.classList.add('primary');
+    setStatus('학습 진행 중…', true);
+    loop();
+  } else {
+    btn.textContent = '▶ Run';
+    setStatus('일시정지.', false);
+  }
+}
+
+function loop(){
+  if(!running) return;
+  runN(5);
+  runTimer = requestAnimationFrame(loop);
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll(){
+  running = false;
+  if(runTimer) cancelAnimationFrame(runTimer);
+  const btn = document.getElementById('runBtn');
+  btn.textContent = '▶ Run'; btn.classList.remove('primary');
+  initQ();
+  rewardHistS = []; rewardHistQ = [];
+  pathS = []; pathQ = [];
+  episodeCount = 0;
+  render();
+  setStatus('초기화 완료. 다시 시작하세요.', false);
+}
+
+// ── Switch tab ────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  running = false;
+  if(runTimer) cancelAnimationFrame(runTimer);
+  document.getElementById('runBtn').textContent = '▶ Run';
+  document.getElementById('runBtn').classList.remove('primary');
+  currentTab = tab;
+  document.getElementById('tabSarsa').className  = 'tab' + (tab==='sarsa'  ? ' active' : '');
+  document.getElementById('tabQlearn').className = 'tab' + (tab==='qlearn' ? ' active-orange' : '');
+  document.getElementById('tabBoth').className   = 'tab' + (tab==='both'   ? ' active-both' : '');
+  initQ();
+  rewardHistS = []; rewardHistQ = [];
+  pathS = []; pathQ = [];
+  episodeCount = 0;
+  render();
+  setStatus('탭 전환. ▶ Run을 눌러 학습을 시작하세요.', false);
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function setStatus(msg, isRunning){
+  const el = document.getElementById('statusBox');
+  el.innerHTML = msg;
+  el.className = 'status-box' + (isRunning ? ' running' : '');
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(){
+  renderGrid();
+  renderStats();
+  renderChart();
+}
+
+function avg100(hist){
+  if(!hist.length) return null;
+  const slice = hist.slice(-100);
+  return slice.reduce((a,b) => a+b, 0) / slice.length;
+}
+
+function renderStats(){
+  document.getElementById('statEp').textContent = episodeCount;
+  const eps = parseFloat(document.getElementById('epsSlider').value) / 100;
+  document.getElementById('statEps').textContent = eps.toFixed(2);
+  const aS = avg100(rewardHistS);
+  const aQ = avg100(rewardHistQ);
+  document.getElementById('statSarsa').textContent  = aS !== null ? aS.toFixed(1) : '—';
+  document.getElementById('statQlearn').textContent = aQ !== null ? aQ.toFixed(1) : '—';
+  if(running && episodeCount > 0){
+    const desc = currentTab === 'both'
+      ? `에피소드 <b>${episodeCount}</b> | SARSA 평균: <b>${aS!==null?aS.toFixed(1):'—'}</b> | Q-Learning 평균: <b>${aQ!==null?aQ.toFixed(1):'—'}</b>`
+      : currentTab === 'sarsa'
+        ? `에피소드 <b>${episodeCount}</b> | SARSA 최근 100 평균: <b>${aS!==null?aS.toFixed(1):'—'}</b>`
+        : `에피소드 <b>${episodeCount}</b> | Q-Learning 최근 100 평균: <b>${aQ!==null?aQ.toFixed(1):'—'}</b>`;
+    setStatus(desc, true);
+  }
+}
+
+// ── Grid rendering ────────────────────────────────────────────────────────────
+function buildGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for(let r = 0; r < ROWS; r++){
+    for(let c = 0; c < COLS; c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = `cell-${r}-${c}`;
+      if(isCliff(r, c)){
+        cell.classList.add('cliff');
+        cell.innerHTML = '<span style="font-size:1rem;color:#e05555">⚡</span>';
+      } else if(isGoal(r,c)){
+        cell.classList.add('goal');
+        cell.innerHTML = '<span style="font-size:1.2rem">🏁</span>';
+      } else if(r===START[0] && c===START[1]){
+        cell.classList.add('start');
+        cell.innerHTML = '<span style="font-size:0.65rem;font-weight:700;color:var(--accent)">S</span>';
+      } else {
+        // canvas for arrow
+        const cv = document.createElement('canvas');
+        cv.width = 55; cv.height = 55;
+        cell.appendChild(cv);
+      }
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function renderGrid(){
+  // draw policy arrows and path
+  const showSarsa  = currentTab === 'sarsa'  || currentTab === 'both';
+  const showQlearn = currentTab === 'qlearn' || currentTab === 'both';
+  const Q = currentTab === 'sarsa' ? QS : currentTab === 'qlearn' ? QL : null;
+
+  for(let r = 0; r < ROWS; r++){
+    for(let c = 0; c < COLS; c++){
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if(!cell) continue;
+
+      // remove old path dots and agents
+      cell.querySelectorAll('.path-dot,.agent-icon').forEach(e => e.remove());
+
+      // draw arrow in normal cells
+      if(!isCliff(r,c) && !isGoal(r,c) && !(r===START[0]&&c===START[1])){
+        const cv = cell.querySelector('canvas');
+        if(cv){
+          const ctx = cv.getContext('2d');
+          ctx.clearRect(0, 0, 55, 55);
+          // draw for active Q table(s)
+          if(currentTab !== 'both'){
+            const sq = currentTab === 'sarsa' ? QS : QL;
+            drawArrow(ctx, sq[stateKey(r,c)], currentTab === 'sarsa' ? '#6c8ebf' : '#bf8c6c');
+          } else {
+            drawArrow(ctx, QS[stateKey(r,c)], 'rgba(108,142,191,0.7)', true);
+            // overlay qlearn arrow subtly
+            drawArrow(ctx, QL[stateKey(r,c)], 'rgba(191,140,108,0.7)', false, true);
+          }
+        }
+      }
+
+      // path dots
+      if(showSarsa){
+        const idx = pathS.findIndex(p => p.r===r && p.c===c);
+        if(idx >= 0){
+          const dot = document.createElement('div');
+          dot.className = 'path-dot sarsa';
+          const size = idx === pathS.length - 1 ? 14 : 8;
+          dot.style.cssText = `width:${size}px;height:${size}px;top:50%;left:${currentTab==='both'?'35%':'50%'};transform:translate(-50%,-50%);z-index:3;`;
+          cell.appendChild(dot);
+        }
+      }
+      if(showQlearn){
+        const idx = pathQ.findIndex(p => p.r===r && p.c===c);
+        if(idx >= 0){
+          const dot = document.createElement('div');
+          dot.className = 'path-dot qlearn';
+          const size = idx === pathQ.length - 1 ? 14 : 8;
+          dot.style.cssText = `width:${size}px;height:${size}px;top:50%;left:${currentTab==='both'?'65%':'50%'};transform:translate(-50%,-50%);z-index:3;`;
+          cell.appendChild(dot);
+        }
+      }
+    }
+  }
+}
+
+function drawArrow(ctx, qvals, color, isLeft, isSmall){
+  const best = qvals.indexOf(Math.max(...qvals));
+  const cx = isLeft ? 20 : isSmall ? 35 : 27;
+  const cy = 27;
+  const len = isSmall ? 6 : 8;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = isSmall ? 1 : 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  const dx = DC[best] * len, dy = DR[best] * len;
+  ctx.lineTo(cx + dx, cy + dy);
+  ctx.stroke();
+  // arrowhead
+  const angle = Math.atan2(dy, dx);
+  const hs = isSmall ? 3 : 4;
+  ctx.beginPath();
+  ctx.moveTo(cx+dx, cy+dy);
+  ctx.lineTo(cx+dx - hs*Math.cos(angle-0.5), cy+dy - hs*Math.sin(angle-0.5));
+  ctx.lineTo(cx+dx - hs*Math.cos(angle+0.5), cy+dy - hs*Math.sin(angle+0.5));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+let rewardChart = null;
+
+function movingAvg(arr, w){
+  const out = [];
+  for(let i = 0; i < arr.length; i++){
+    const start = Math.max(0, i - w + 1);
+    const slice = arr.slice(start, i+1);
+    out.push(slice.reduce((a,b)=>a+b,0)/slice.length);
+  }
+  return out;
+}
+
+function renderChart(){
+  const W = 50;
+  const maS = movingAvg(rewardHistS, W);
+  const maQ = movingAvg(rewardHistQ, W);
+  const maxLen = Math.max(maS.length, maQ.length, 1);
+  const labels = Array.from({length: maxLen}, (_,i) => i+1);
+  // pad shorter
+  const padS = [...Array(maxLen - maS.length).fill(null), ...maS];
+  const padQ = [...Array(maxLen - maQ.length).fill(null), ...maQ];
+
+  if(!rewardChart){
+    const ctx = document.getElementById('rewardChart').getContext('2d');
+    rewardChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label:'SARSA', data: padS, borderColor:'#6c8ebf', backgroundColor:'rgba(108,142,191,0.07)', borderWidth:1.5, pointRadius:0, tension:0.3, spanGaps:true },
+          { label:'Q-Learning', data: padQ, borderColor:'#bf8c6c', backgroundColor:'rgba(191,140,108,0.07)', borderWidth:1.5, pointRadius:0, tension:0.3, spanGaps:true }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color:'#8892a4', maxTicksLimit:8, font:{size:9} }, grid:{color:'rgba(46,49,70,0.5)'} },
+          y: { ticks: { color:'#8892a4', font:{size:9} }, grid:{color:'rgba(46,49,70,0.5)'}, suggestedMin:-200, suggestedMax:0 }
+        },
+        plugins: { legend:{display:false} }
+      }
+    });
+  } else {
+    rewardChart.data.labels = labels;
+    rewardChart.data.datasets[0].data = padS;
+    rewardChart.data.datasets[1].data = padQ;
+    rewardChart.update('none');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+initQ();
+buildGrid();
+render();
+</script>
+</body>
+</html>

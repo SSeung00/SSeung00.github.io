@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dyna-Q — 경험을 재활용하면 얼마나 빠를까?</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+  --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+  --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+  --font-mono: 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  padding: 20px;
+  min-height: 100vh;
+}
+h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.section-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.slider-label { font-size: 0.82rem; color: var(--text-muted); min-width: 80px; }
+input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); cursor: pointer; }
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.k-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent-2);
+  min-width: 110px;
+  text-align: center;
+}
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+button:hover { border-color: var(--accent); background: #2a2f44; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: #7a9dcf; }
+.status-box {
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-height: 32px;
+  margin-top: 10px;
+}
+.two-panel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media(max-width: 700px){
+  .two-panel { grid-template-columns: 1fr; }
+}
+/* Grid canvas wrapper */
+#gridWrap {
+  position: relative;
+  display: inline-block;
+}
+canvas#gridCanvas {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: center;
+}
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.stat-value.orange { color: var(--accent-2); }
+.stat-value.green { color: var(--success); }
+.stat-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+.chart-container { position: relative; height: 260px; }
+.legend-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 0.78rem; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-line { width: 20px; height: 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Dyna-Q — 경험을 재활용하면 얼마나 빠를까?</h1>
+<p class="subtitle">8×8 Gridworld에서 계획 스텝 k를 늘릴수록 순수 Q-learning보다 훨씬 빠르게 최적 경로를 학습합니다.</p>
+
+<div class="card">
+  <div class="section-title">계획 스텝 수 k</div>
+  <div class="slider-row">
+    <span class="slider-label">k 값:</span>
+    <div style="flex:1;min-width:160px;">
+      <input type="range" id="kSlider" min="0" max="50" value="10" step="1">
+      <div class="slider-labels"><span>k=0 순수 Q-learning</span><span>k=50 플래닝 50회</span></div>
+    </div>
+    <div class="k-display" id="kDisplay">k = 10</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-title">컨트롤</div>
+  <div class="controls">
+    <button class="primary" id="btnRun">▶ Run</button>
+    <button id="btn1">+1 ep</button>
+    <button id="btn10">+10 ep</button>
+    <button id="btnReset">↺ Reset</button>
+  </div>
+  <div class="status-box" id="statusBox">초기화 완료. Run을 눌러 시작하세요.</div>
+</div>
+
+<div class="two-panel card" style="padding:16px;">
+  <!-- LEFT: Grid -->
+  <div>
+    <div class="section-title" style="margin-bottom:8px;">환경 (8×8 Gridworld)</div>
+    <div id="gridWrap">
+      <canvas id="gridCanvas" width="320" height="320"></canvas>
+    </div>
+    <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted);">
+      ■ 벽 &nbsp;|&nbsp; 🏁 목표 &nbsp;|&nbsp; 🤖 에이전트 &nbsp;|&nbsp; 화살표: 최적 행동 &nbsp;|&nbsp; 연한 셀: 방문 기록
+    </div>
+  </div>
+
+  <!-- RIGHT: Stats + Chart -->
+  <div>
+    <div class="section-title">통계</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statEp">0</div>
+        <div class="stat-label">에피소드</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value orange" id="statGoals">0</div>
+        <div class="stat-label">목표 도달 횟수</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statReal">0</div>
+        <div class="stat-label">실제 환경 스텝</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green" id="statSim">0</div>
+        <div class="stat-label">시뮬레이션 스텝 (계획)</div>
+      </div>
+    </div>
+
+    <div class="section-title">에피소드별 목표 도달 스텝 수</div>
+    <div class="chart-container">
+      <canvas id="stepsChart"></canvas>
+    </div>
+    <div class="legend-row" id="legendRow"></div>
+  </div>
+</div>
+
+<script>
+// ─── Environment ───────────────────────────────────────────────────────────
+const GRID = 8;
+const START = 0;           // (0,0)
+const GOAL_RC = [7,7];
+const GOAL = 7*GRID+7;     // 63
+const MAX_STEPS = 200;
+const ALPHA = 0.1, GAMMA = 0.95, EPSILON = 0.1;
+
+// Walls as [row,col]
+const WALL_RC = [[2,1],[2,2],[2,3],[2,4],[3,4],[4,4],[5,4],[5,5],[5,6],[3,6],[4,6]];
+const WALLS = new Set(WALL_RC.map(([r,c]) => r*GRID+c));
+
+const ACTIONS = [[-1,0],[1,0],[0,-1],[0,1]]; // up,down,left,right
+const ACT_ARROWS = ['↑','↓','←','→'];
+
+function stateToRC(s){ return [Math.floor(s/GRID), s%GRID]; }
+function rcToState(r,c){ return r*GRID+c; }
+
+function envStep(s, a){
+  if(s === GOAL) return {ns: s, r: 0, done: true};
+  let [r,c] = stateToRC(s);
+  let [dr,dc] = ACTIONS[a];
+  let nr = Math.max(0, Math.min(GRID-1, r+dr));
+  let nc = Math.max(0, Math.min(GRID-1, c+dc));
+  let ns = rcToState(nr,nc);
+  if(WALLS.has(ns)){ ns = s; } // bounce back
+  let done = ns === GOAL;
+  let reward = done ? 1 : 0;
+  return {ns, r: reward, done};
+}
+
+// ─── Agent State ───────────────────────────────────────────────────────────
+let Q_current, model_current, visited_current;
+let Q_baseline, model_baseline, visited_baseline;
+let episodes_current, episodes_baseline;
+let realSteps, simSteps, goals_current, goals_baseline;
+let stepsHistory_current, stepsHistory_baseline;
+let agentPos;
+let running = false, animId = null;
+let stepsChart = null;
+
+function makeQ(){ return new Float64Array(GRID*GRID*4); }
+function qGet(Q,s,a){ return Q[s*4+a]; }
+function qSet(Q,s,a,v){ Q[s*4+a]=v; }
+function maxQ(Q,s){
+  let m=-Infinity;
+  for(let a=0;a<4;a++) if(qGet(Q,s,a)>m) m=qGet(Q,s,a);
+  return m;
+}
+function argmaxQ(Q,s){
+  let best=0, bv=-Infinity;
+  for(let a=0;a<4;a++){let v=qGet(Q,s,a);if(v>bv){bv=v;best=a;}}
+  return best;
+}
+
+function init(){
+  Q_current = makeQ();
+  model_current = new Map();
+  visited_current = new Set();
+  episodes_current = 0;
+  goals_current = 0;
+  realSteps = 0;
+  simSteps = 0;
+  stepsHistory_current = [];
+
+  // Baseline: k=0 pure Q-learning, same init
+  Q_baseline = makeQ();
+  model_baseline = new Map();
+  visited_baseline = new Set();
+  episodes_baseline = 0;
+  goals_baseline = 0;
+  stepsHistory_baseline = [];
+
+  agentPos = START;
+  if(stepsChart){ stepsChart.destroy(); stepsChart = null; }
+  updateStats();
+  drawGrid();
+  buildChart();
+  setStatus('초기화 완료. Run을 눌러 시작하세요.');
+}
+
+// ─── Epsilon-greedy ────────────────────────────────────────────────────────
+function epsGreedy(Q, s){
+  if(Math.random() < EPSILON) return Math.floor(Math.random()*4);
+  return argmaxQ(Q,s);
+}
+
+// ─── Dyna-Q episode ────────────────────────────────────────────────────────
+function runDynaEpisode(Q, mdl, vis, k){
+  let s = START;
+  let steps = 0;
+  let reached = false;
+  while(steps < MAX_STEPS){
+    let a = epsGreedy(Q, s);
+    let {ns, r, done} = envStep(s, a);
+    // Q-update
+    let target = r + GAMMA * maxQ(Q, ns);
+    qSet(Q, s, a, qGet(Q,s,a) + ALPHA*(target - qGet(Q,s,a)));
+    // Model update
+    mdl.set(s*4+a, {r, ns});
+    vis.add(s);
+    steps++;
+    // Planning
+    let modelKeys = Array.from(mdl.keys());
+    for(let p=0; p<k; p++){
+      let key = modelKeys[Math.floor(Math.random()*modelKeys.length)];
+      let sp = Math.floor(key/4), ap = key%4;
+      let {r:rp, ns:nsp} = mdl.get(key);
+      let tp = rp + GAMMA * maxQ(Q, nsp);
+      qSet(Q, sp, ap, qGet(Q,sp,ap) + ALPHA*(tp - qGet(Q,sp,ap)));
+    }
+    s = ns;
+    if(done){ reached = true; break; }
+  }
+  return {steps, reached};
+}
+
+function runBatch(count){
+  let k = parseInt(document.getElementById('kSlider').value);
+  for(let i=0;i<count;i++){
+    // Current agent (with k)
+    let {steps:sc, reached:rc} = runDynaEpisode(Q_current, model_current, visited_current, k);
+    episodes_current++;
+    if(rc){ goals_current++; }
+    stepsHistory_current.push(sc);
+    realSteps += sc;
+    simSteps += sc * k;
+
+    // Baseline (k=0) — run in sync if k>0 for comparison
+    if(k > 0){
+      let {steps:sb, reached:rb} = runDynaEpisode(Q_baseline, model_baseline, visited_baseline, 0);
+      episodes_baseline++;
+      if(rb) goals_baseline++;
+      stepsHistory_baseline.push(sb);
+    }
+  }
+  agentPos = START;
+}
+
+// ─── Grid Drawing ──────────────────────────────────────────────────────────
+const CELL = 40;
+
+function drawGrid(){
+  let canvas = document.getElementById('gridCanvas');
+  canvas.width = GRID*CELL;
+  canvas.height = GRID*CELL;
+  let ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let r=0;r<GRID;r++){
+    for(let c=0;c<GRID;c++){
+      let s = rcToState(r,c);
+      let x = c*CELL, y = r*CELL;
+
+      if(WALLS.has(s)){
+        ctx.fillStyle = '#1e2235';
+        ctx.fillRect(x,y,CELL,CELL);
+        // wall pattern
+        ctx.fillStyle = '#16192a';
+        ctx.fillRect(x+2,y+2,CELL-4,CELL-4);
+      } else if(s === GOAL){
+        ctx.fillStyle = '#1a2e1e';
+        ctx.fillRect(x,y,CELL,CELL);
+      } else if(visited_current.has(s)){
+        // visited: slightly highlighted
+        let alpha = 0.18;
+        ctx.fillStyle = `rgba(108,142,191,${alpha})`;
+        ctx.fillRect(x,y,CELL,CELL);
+      } else {
+        ctx.fillStyle = '#1a1d27';
+        ctx.fillRect(x,y,CELL,CELL);
+      }
+
+      // border
+      ctx.strokeStyle = '#2e3146';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x,y,CELL,CELL);
+
+      // Q-value arrow for non-wall, non-goal cells
+      if(!WALLS.has(s) && s !== GOAL && episodes_current > 0){
+        let best = argmaxQ(Q_current, s);
+        let bv = maxQ(Q_current, s);
+        if(bv > -Infinity){
+          ctx.fillStyle = bv > 0.5 ? '#6cbf8e' : bv > 0 ? '#6c8ebf' : '#555e72';
+          ctx.font = `${CELL*0.4}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ACT_ARROWS[best], x+CELL/2, y+CELL/2);
+        }
+      }
+
+      // Goal flag
+      if(s === GOAL){
+        ctx.font = `${CELL*0.55}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🏁', x+CELL/2, y+CELL/2+1);
+      }
+    }
+  }
+
+  // Draw agent
+  {
+    let [r,c] = stateToRC(agentPos);
+    let x = c*CELL, y = r*CELL;
+    ctx.font = `${CELL*0.5}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🤖', x+CELL/2, y+CELL/2+1);
+  }
+}
+
+// ─── Chart ─────────────────────────────────────────────────────────────────
+function buildChart(){
+  let k = parseInt(document.getElementById('kSlider').value);
+  let ctx = document.getElementById('stepsChart').getContext('2d');
+
+  let smooth = (arr, w=5) => arr.map((v,i) => {
+    let s=0, cnt=0;
+    for(let j=Math.max(0,i-w);j<=Math.min(arr.length-1,i+w);j++){s+=arr[j];cnt++;}
+    return s/cnt;
+  });
+
+  let datasets = [];
+  if(k > 0 && stepsHistory_baseline.length > 0){
+    datasets.push({
+      label: 'k=0 (순수 Q-learning)',
+      data: smooth(stepsHistory_baseline),
+      borderColor: '#bf6c6c',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.4
+    });
+  }
+  if(stepsHistory_current.length > 0){
+    datasets.push({
+      label: `k=${k}${k===0?' (순수 Q-learning)':' (Dyna-Q)'}`,
+      data: smooth(stepsHistory_current),
+      borderColor: '#6cbf8e',
+      backgroundColor: 'transparent',
+      borderWidth: k===0?2:2.5,
+      pointRadius: 0,
+      tension: 0.4
+    });
+  }
+
+  let maxLen = Math.max(stepsHistory_current.length, stepsHistory_baseline.length, 1);
+  let labels = Array.from({length: maxLen}, (_,i) => i+1);
+
+  if(!stepsChart){
+    stepsChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1d27',
+            borderColor: '#2e3146',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#8892a4',
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: '에피소드', color: '#8892a4', font:{size:11} },
+            ticks: { color: '#8892a4', maxTicksLimit: 8 },
+            grid: { color: '#2e3146' }
+          },
+          y: {
+            title: { display: true, text: '목표까지 스텝 수 (낮을수록 좋음)', color: '#8892a4', font:{size:10} },
+            ticks: { color: '#8892a4' },
+            grid: { color: '#2e3146' },
+            min: 0,
+            max: MAX_STEPS + 10,
+            suggestedMax: MAX_STEPS
+          }
+        }
+      }
+    });
+  } else {
+    stepsChart.data.labels = labels;
+    stepsChart.data.datasets = datasets;
+    stepsChart.update('none');
+  }
+
+  buildLegend(k, datasets);
+}
+
+function buildLegend(k, datasets){
+  let row = document.getElementById('legendRow');
+  row.innerHTML = '';
+  if(k>0 && stepsHistory_baseline.length>0){
+    row.innerHTML += `<div class="legend-item">
+      <div class="legend-line" style="background:#bf6c6c;"></div>
+      <span style="color:var(--text-muted)">k=0 (순수 Q-learning)</span>
+    </div>`;
+  }
+  if(stepsHistory_current.length>0){
+    row.innerHTML += `<div class="legend-item">
+      <div class="legend-line" style="background:#6cbf8e;height:${k>0?4:3}px;"></div>
+      <span style="color:var(--text)">k=${k}${k===0?' (순수 Q-learning)':' (Dyna-Q)'}</span>
+    </div>`;
+  }
+}
+
+// ─── Stats ─────────────────────────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('statEp').textContent = episodes_current;
+  document.getElementById('statGoals').textContent = goals_current;
+  document.getElementById('statReal').textContent = realSteps;
+  document.getElementById('statSim').textContent = simSteps;
+}
+
+function setStatus(msg){
+  document.getElementById('statusBox').textContent = msg;
+}
+
+// ─── Run loop ──────────────────────────────────────────────────────────────
+let totalTarget = 0;
+
+function runAnimated(count){
+  totalTarget = episodes_current + count;
+  if(running) return;
+  running = true;
+  document.getElementById('btnRun').textContent = '⏸ Pause';
+  document.getElementById('btnRun').classList.add('primary');
+
+  function tick(){
+    if(!running) return;
+    let rem = totalTarget - episodes_current;
+    if(rem <= 0){
+      running = false;
+      document.getElementById('btnRun').textContent = '▶ Run';
+      let k = parseInt(document.getElementById('kSlider').value);
+      setStatus(`완료! ${episodes_current} 에피소드, k=${k}, 목표 도달 ${goals_current}회.`);
+      drawGrid();
+      buildChart();
+      updateStats();
+      return;
+    }
+    let batch = Math.min(5, rem);
+    runBatch(batch);
+    if(episodes_current % 5 === 0 || rem <= batch){
+      drawGrid();
+      buildChart();
+      updateStats();
+      let k = parseInt(document.getElementById('kSlider').value);
+      setStatus(`학습 중... ${episodes_current}/${totalTarget} 에피소드 (k=${k}, 도달: ${goals_current}회)`);
+    }
+    animId = requestAnimationFrame(tick);
+  }
+  animId = requestAnimationFrame(tick);
+}
+
+// ─── Button handlers ───────────────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click', ()=>{
+  if(running){
+    running = false;
+    document.getElementById('btnRun').textContent = '▶ Run';
+    setStatus(`일시정지. ${episodes_current} 에피소드 완료.`);
+  } else {
+    runAnimated(200);
+  }
+});
+document.getElementById('btn1').addEventListener('click', ()=>{
+  if(!running){ runBatch(1); drawGrid(); buildChart(); updateStats();
+    let k=parseInt(document.getElementById('kSlider').value);
+    setStatus(`${episodes_current} 에피소드 완료 (k=${k}).`); }
+});
+document.getElementById('btn10').addEventListener('click', ()=>{
+  if(!running) runAnimated(10);
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(animId) cancelAnimationFrame(animId);
+  running = false;
+  document.getElementById('btnRun').textContent = '▶ Run';
+  if(stepsChart){ stepsChart.destroy(); stepsChart = null; }
+  init();
+});
+
+document.getElementById('kSlider').addEventListener('input', ()=>{
+  let k = parseInt(document.getElementById('kSlider').value);
+  let label = k === 0 ? '순수 Q-learning (계획 없음)' : `${k}번 시뮬레이션`;
+  document.getElementById('kDisplay').textContent = `k = ${k}`;
+  // Reset and start fresh with new k
+  if(animId) cancelAnimationFrame(animId);
+  running = false;
+  document.getElementById('btnRun').textContent = '▶ Run';
+  if(stepsChart){ stepsChart.destroy(); stepsChart = null; }
+  init();
+  setStatus(`k=${k} (${label}) — Reset 완료. Run을 눌러 시작하세요.`);
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+init();
+</script>
+
+<script>
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
+</body>
+</html>

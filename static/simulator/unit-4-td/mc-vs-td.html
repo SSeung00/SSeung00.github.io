@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC vs TD — 업데이트 타이밍 비교</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+    --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+    --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+    --font-mono: 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 13px;
+    padding: 10px 12px; margin: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  h1 { font-size: 0.95rem; color: var(--text); font-weight: 600; }
+  .subtitle { font-size: 0.75rem; color: var(--text-muted); }
+
+  /* ── Params ────────────────────────────── */
+  .params-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .param-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; }
+  .param-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; margin-bottom: 4px; }
+  .param-name { font-family: var(--font-mono); color: var(--text-muted); }
+  .param-val  { font-family: var(--font-mono); color: var(--accent); background: var(--surface-2); padding: 1px 7px; border-radius: 4px; min-width: 36px; text-align: center; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none; }
+
+  /* ── Controls ───────────────────────────── */
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 0.78rem; transition: 0.15s; user-select: none; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 700; }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger  { border-color: var(--danger); color: var(--danger); }
+  .btn.danger:hover { background: var(--danger); color: #0f1117; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Status ────────────────────────────── */
+  .status-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 12px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--text-muted); line-height: 1.5;
+  }
+  .status-box.running { border-left: 3px solid var(--accent-2); }
+  .status-box.done    { border-left: 3px solid var(--success); }
+  .status-box b { color: var(--accent); }
+
+  /* ── Two-panel layout ───────────────────── */
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px;
+    display: flex; flex-direction: column; gap: 8px; position: relative;
+  }
+  .panel-mc { border-top: 3px solid var(--accent-2); }
+  .panel-td { border-top: 3px solid var(--accent); }
+
+  .panel-title {
+    font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 6px;
+  }
+  .panel-mc .panel-title { color: var(--accent-2); }
+  .panel-td .panel-title { color: var(--accent); }
+
+  .badge {
+    font-size: 0.62rem; padding: 2px 7px; border-radius: 4px;
+    font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.04em;
+  }
+  .badge-frozen { background: rgba(191,140,108,0.15); color: var(--accent-2); border: 1px solid var(--accent-2); }
+  .badge-live   { background: rgba(108,142,191,0.15); color: var(--accent);   border: 1px solid var(--accent); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .panel-sub { font-size: 0.68rem; color: var(--text-muted); }
+
+  /* ── Grid ───────────────────────────────── */
+  .grid-wrap { position: relative; }
+  .grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 3px; width: 100%;
+  }
+  .cell {
+    aspect-ratio: 1; border-radius: 5px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; font-size: 0.68rem; font-family: var(--font-mono);
+    transition: background-color 0.3s, border-color 0.25s;
+    border: 2px solid transparent;
+    cursor: default; user-select: none;
+  }
+  .cell .val { font-weight: 700; font-size: 0.72rem; }
+  .cell .coord { font-size: 0.52rem; color: rgba(255,255,255,0.35); margin-top: 1px; }
+  .cell.goal { border: 2px solid var(--success) !important; }
+  .cell.goal .val { color: var(--success); }
+  .cell.agent::after {
+    content: ''; position: absolute;
+    width: 38%; height: 38%; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 6px #fff;
+    pointer-events: none;
+  }
+  .cell.flash { border-color: var(--accent-2) !important; }
+  .cell.trail { border-color: rgba(255,255,255,0.2) !important; }
+
+  /* MC frozen overlay */
+  .frozen-overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(15,17,23,0.55); border-radius: var(--radius);
+    align-items: center; justify-content: center;
+    font-size: 0.75rem; font-family: var(--font-mono); color: var(--accent-2);
+    letter-spacing: 0.06em; font-weight: 700; z-index: 5;
+    border: 2px dashed rgba(191,140,108,0.4);
+  }
+  .frozen-overlay.visible { display: flex; }
+
+  /* ── RMSE chart ─────────────────────────── */
+  .chart-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px; position: relative;
+  }
+  .chart-title { font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .chart-wrap { height: 160px; }
+  .chart-legend { display: flex; gap: 14px; margin-top: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── Stats row ──────────────────────────── */
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { background: var(--surface-2); border-radius: 6px; padding: 7px 10px; display: flex; flex-direction: column; gap: 3px; }
+  .stat-label { font-size: 0.67rem; color: var(--text-muted); }
+  .stat-val { font-family: var(--font-mono); font-size: 0.82rem; }
+  .stat-val.mc { color: var(--accent-2); }
+  .stat-val.td { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Title -->
+<div>
+  <h1>MC vs TD — 업데이트 타이밍 비교</h1>
+  <div class="subtitle">MC는 에피소드가 끝난 후, TD는 매 스텝마다 즉시 업데이트합니다.</div>
+</div>
+
+<!-- Params -->
+<div class="params-row">
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">γ (감가율)</span>
+      <span class="param-val" id="gammaVal">0.90</span>
+    </div>
+    <input type="range" id="gammaSlider" min="0.5" max="0.99" step="0.01" value="0.90">
+  </div>
+  <div class="param-card">
+    <div class="param-top">
+      <span class="param-name">속도 (ep/tick)</span>
+      <span class="param-val" id="speedVal">1</span>
+    </div>
+    <input type="range" id="speedSlider" min="1" max="20" step="1" value="1">
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn primary" id="btnRun">▶ 실행</button>
+  <button class="btn" id="btn1ep">1 에피소드</button>
+  <button class="btn" id="btn10ep">10 에피소드</button>
+  <button class="btn" id="btn100ep">100 에피소드</button>
+  <button class="btn danger" id="btnReset">↺ 리셋</button>
+</div>
+
+<!-- Status -->
+<div class="status-box" id="statusBox">대기 중 — 실행 버튼을 눌러 시작하세요.</div>
+
+<!-- Two panels -->
+<div class="panels">
+  <!-- MC panel -->
+  <div class="panel panel-mc">
+    <div class="panel-title">
+      MC
+      <span class="badge badge-frozen" id="mcBadge">FROZEN</span>
+    </div>
+    <div class="panel-sub">에피소드 종료 후 업데이트</div>
+    <div class="grid-wrap">
+      <div class="grid" id="gridMC"></div>
+      <div class="frozen-overlay" id="frozenOverlay">⏸ 에피소드 진행 중</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">RMSE</div><div class="stat-val mc" id="mcRmse">—</div></div>
+      <div class="stat-card"><div class="stat-label">에피소드</div><div class="stat-val mc" id="mcEps">0</div></div>
+    </div>
+  </div>
+
+  <!-- TD panel -->
+  <div class="panel panel-td">
+    <div class="panel-title">
+      TD(0)
+      <span class="badge badge-live" id="tdBadge">LIVE UPDATE</span>
+    </div>
+    <div class="panel-sub">매 스텝 즉시 업데이트</div>
+    <div class="grid-wrap">
+      <div class="grid" id="gridTD"></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">RMSE</div><div class="stat-val td" id="tdRmse">—</div></div>
+      <div class="stat-card"><div class="stat-label">에피소드</div><div class="stat-val td" id="tdEps">0</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- RMSE chart -->
+<div class="chart-panel">
+  <div class="chart-title">RMSE 수렴 곡선 (낮을수록 좋음)</div>
+  <div class="chart-wrap"><canvas id="rmseChart"></canvas></div>
+  <div class="chart-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent-2)"></div>MC</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>TD(0)</div>
+  </div>
+</div>
+
+<script>
+// ── Constants ─────────────────────────────────────────────
+const ROWS = 4, COLS = 4;
+const ACTIONS = [[-1,0],[1,0],[0,-1],[0,1]]; // up down left right
+const ALPHA = 0.1;
+const GOAL_R = 3, GOAL_C = 3;
+const MAX_CHART_POINTS = 300;
+
+let gamma = 0.90;
+let speed = 1;
+let running = false;
+let runTimer = null;
+let episodeCount = 0;
+
+// Value tables
+let V_mc, V_td, N_mc; // N_mc = visit counts for incremental MC
+let trueV;
+let rmseMC_hist = [], rmseTD_hist = [];
+
+// ── Init true values via Bellman iteration ────────────────
+function computeTrueV(g) {
+  const V = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  for(let sweep=0; sweep<1000; sweep++){
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+      if(r===GOAL_R && c===GOAL_C){ V[r][c]=0; continue; }
+      let sum=0;
+      for(const [dr,dc] of ACTIONS){
+        let nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS){nr=r;nc=c;}
+        sum += 0.25*(-1 + g*V[nr][nc]);
+      }
+      V[r][c]=sum;
+    }
+  }
+  return V;
+}
+
+function resetAll(){
+  gamma = parseFloat(document.getElementById('gammaSlider').value);
+  trueV = computeTrueV(gamma);
+  V_mc = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  V_td = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  N_mc = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  episodeCount = 0;
+  rmseMC_hist = []; rmseTD_hist = [];
+  renderGrid('gridMC', V_mc, null, null);
+  renderGrid('gridTD', V_td, null, null);
+  document.getElementById('mcRmse').textContent = '—';
+  document.getElementById('tdRmse').textContent = '—';
+  document.getElementById('mcEps').textContent = '0';
+  document.getElementById('tdEps').textContent = '0';
+  document.getElementById('frozenOverlay').classList.remove('visible');
+  setStatus('대기 중 — 실행 버튼을 눌러 시작하세요.', '');
+  updateChart();
+}
+
+// ── Seeded RNG (mulberry32) ────────────────────────────────
+function mulberry32(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    let t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ── Run one episode ───────────────────────────────────────
+function runEpisode(seed){
+  const rng = mulberry32(seed);
+  let r=0, c=0;
+  const traj=[]; // [{r,c,reward}]
+
+  // Generate trajectory
+  while(!(r===GOAL_R && c===GOAL_C)){
+    const ai = Math.floor(rng()*4);
+    const [dr,dc] = ACTIONS[ai];
+    let nr=r+dr, nc=c+dc;
+    if(nr<0||nr>=ROWS||nc<0||nc>=COLS){nr=r;nc=c;}
+    const reward = (nr===GOAL_R && nc===GOAL_C) ? 0 : -1;
+    traj.push({r,c,nr,nc,reward});
+    r=nr; c=nc;
+    if(traj.length>500) break; // safety
+  }
+
+  // TD update: every step
+  for(const {r,c,nr,nc,reward} of traj){
+    const isGoal = nr===GOAL_R && nc===GOAL_C;
+    const target = reward + (isGoal ? 0 : gamma*V_td[nr][nc]);
+    V_td[r][c] += ALPHA*(target - V_td[r][c]);
+  }
+
+  // MC update: episode end, first-visit
+  const seen = new Set();
+  let G = 0;
+  for(let i=traj.length-1;i>=0;i--){
+    const {r,c,reward} = traj[i];
+    G = reward + gamma*G;
+    const key=`${r},${c}`;
+    if(!seen.has(key)){
+      seen.add(key);
+      N_mc[r][c]++;
+      V_mc[r][c] += (1/N_mc[r][c])*(G - V_mc[r][c]);
+    }
+  }
+
+  return traj;
+}
+
+// ── RMSE ──────────────────────────────────────────────────
+function calcRMSE(V){
+  let sum=0, cnt=0;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(r===GOAL_R&&c===GOAL_C) continue;
+    sum += (V[r][c]-trueV[r][c])**2;
+    cnt++;
+  }
+  return Math.sqrt(sum/cnt);
+}
+
+// ── Cell color ────────────────────────────────────────────
+function valToColor(v){
+  // trueV range is roughly -40..0
+  const minV=-40, maxV=0;
+  const norm = Math.max(0,Math.min(1,(v-minV)/(maxV-minV)));
+  const l = 12 + norm*42;
+  return `hsl(220, 55%, ${l}%)`;
+}
+
+// ── Render grid ───────────────────────────────────────────
+function renderGrid(id, V, agentPos, flashCells){
+  const grid = document.getElementById(id);
+  // Create cells if needed
+  if(grid.children.length !== ROWS*COLS){
+    grid.innerHTML='';
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.id=`${id}_${r}_${c}`;
+      cell.innerHTML=`<span class="val">0.0</span><span class="coord">${r},${c}</span>`;
+      grid.appendChild(cell);
+    }
+  }
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const cell=document.getElementById(`${id}_${r}_${c}`);
+    const v=V[r][c];
+    cell.style.background = valToColor(v);
+    cell.querySelector('.val').textContent = v.toFixed(1);
+    cell.classList.remove('goal','agent','flash','trail');
+    if(r===GOAL_R&&c===GOAL_C) cell.classList.add('goal');
+    if(agentPos&&agentPos[0]===r&&agentPos[1]===c) cell.classList.add('agent');
+    if(flashCells&&flashCells.some(([fr,fc])=>fr===r&&fc===c)) cell.classList.add('flash');
+  }
+}
+
+function flashCell(gridId, r, c){
+  const cell=document.getElementById(`${gridId}_${r}_${c}`);
+  if(!cell) return;
+  cell.classList.add('flash');
+  setTimeout(()=>cell.classList.remove('flash'), 400);
+}
+
+// ── Chart ─────────────────────────────────────────────────
+let chart;
+function initChart(){
+  const ctx=document.getElementById('rmseChart').getContext('2d');
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:[],
+      datasets:[
+        {label:'MC',data:[],borderColor:'#bf8c6c',backgroundColor:'rgba(191,140,108,0.08)',
+         borderWidth:1.5,pointRadius:0,tension:0.3},
+        {label:'TD(0)',data:[],borderColor:'#6c8ebf',backgroundColor:'rgba(108,142,191,0.08)',
+         borderWidth:1.5,pointRadius:0,tension:0.3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{
+        x:{ticks:{color:'#8892a4',font:{size:10},maxTicksLimit:8},
+           grid:{color:'rgba(46,49,70,0.8)'},
+           title:{display:true,text:'에피소드',color:'#8892a4',font:{size:10}}},
+        y:{ticks:{color:'#8892a4',font:{size:10},maxTicksLimit:6},
+           grid:{color:'rgba(46,49,70,0.8)'},
+           title:{display:true,text:'RMSE',color:'#8892a4',font:{size:10}},
+           beginAtZero:true}
+      }
+    }
+  });
+}
+
+function updateChart(){
+  if(!chart) return;
+  let mcD=rmseMC_hist, tdD=rmseTD_hist;
+  let labels=mcD.map((_,i)=>i+1);
+  if(mcD.length>MAX_CHART_POINTS){
+    const step=Math.ceil(mcD.length/MAX_CHART_POINTS);
+    mcD=mcD.filter((_,i)=>i%step===0||i===mcD.length-1);
+    tdD=tdD.filter((_,i)=>i%step===0||i===tdD.length-1);
+    labels=labels.filter((_,i)=>i%step===0||i===labels.length-1);
+  }
+  chart.data.labels=labels;
+  chart.data.datasets[0].data=mcD;
+  chart.data.datasets[1].data=tdD;
+  chart.update('none');
+}
+
+// ── Status ────────────────────────────────────────────────
+function setStatus(msg, cls){
+  const box=document.getElementById('statusBox');
+  box.innerHTML=msg; box.className='status-box '+(cls||'');
+}
+
+// ── Run N episodes ────────────────────────────────────────
+function doEpisodes(n){
+  for(let i=0;i<n;i++){
+    episodeCount++;
+    runEpisode(episodeCount*1000 + Math.floor(Math.random()*999));
+    rmseMC_hist.push(calcRMSE(V_mc));
+    rmseTD_hist.push(calcRMSE(V_td));
+  }
+  renderGrid('gridMC', V_mc, null, null);
+  renderGrid('gridTD', V_td, null, null);
+  document.getElementById('mcEps').textContent = episodeCount;
+  document.getElementById('tdEps').textContent = episodeCount;
+  const rm=rmseMC_hist[rmseMC_hist.length-1]||0;
+  const rt=rmseTD_hist[rmseTD_hist.length-1]||0;
+  document.getElementById('mcRmse').textContent = rm.toFixed(3);
+  document.getElementById('tdRmse').textContent = rt.toFixed(3);
+  updateChart();
+}
+
+// ── Animated single episode ───────────────────────────────
+// Shows step-by-step with agent moving on both grids
+let animTrajectory=[], animStep=0, animSeed=0;
+let animRunning=false;
+
+function startAnimEpisode(onDone){
+  episodeCount++;
+  animSeed = episodeCount*1000 + Math.floor(Math.random()*999);
+
+  // Pre-generate trajectory
+  const rng = mulberry32(animSeed);
+  let r=0, c=0;
+  animTrajectory=[];
+  // Save TD snapshot before episode for MC display
+  const V_mc_snap = V_mc.map(row=>[...row]);
+
+  while(!(r===GOAL_R && c===GOAL_C)){
+    const ai=Math.floor(rng()*4);
+    const [dr,dc]=ACTIONS[ai];
+    let nr=r+dr, nc=c+dc;
+    if(nr<0||nr>=ROWS||nc<0||nc>=COLS){nr=r;nc=c;}
+    const reward=(nr===GOAL_R&&nc===GOAL_C)?0:-1;
+    animTrajectory.push({r,c,nr,nc,reward});
+    r=nr; c=nc;
+    if(animTrajectory.length>500) break;
+  }
+
+  // Show frozen overlay on MC
+  document.getElementById('frozenOverlay').classList.add('visible');
+  setStatus(`<b>에피소드 ${episodeCount}</b> 실행 중... (총 ${animTrajectory.length} 스텝)`, 'running');
+
+  // Apply TD step-by-step, MC only at end
+  // We'll accumulate returns for MC
+  animStep=0;
+  animRunning=true;
+
+  // Save MC state at episode start
+  const mc_start = V_mc.map(row=>[...row]);
+  const mc_n_start = N_mc.map(row=>[...row]);
+  // We'll update MC at end, so keep mc stable during animation
+
+  function step(){
+    if(!animRunning) return;
+    if(animStep>=animTrajectory.length){
+      // Episode done — apply MC update
+      let G=0;
+      const seen=new Set();
+      for(let i=animTrajectory.length-1;i>=0;i--){
+        const {r,c,reward}=animTrajectory[i];
+        G=reward+gamma*G;
+        const key=`${r},${c}`;
+        if(!seen.has(key)){
+          seen.add(key);
+          N_mc[r][c]++;
+          V_mc[r][c]+=(1/N_mc[r][c])*(G-V_mc[r][c]);
+        }
+      }
+      rmseMC_hist.push(calcRMSE(V_mc));
+      rmseTD_hist.push(calcRMSE(V_td));
+      renderGrid('gridMC',V_mc,null,null);
+      renderGrid('gridTD',V_td,null,null);
+      document.getElementById('frozenOverlay').classList.remove('visible');
+      document.getElementById('mcEps').textContent=episodeCount;
+      document.getElementById('tdEps').textContent=episodeCount;
+      document.getElementById('mcRmse').textContent=rmseMC_hist[rmseMC_hist.length-1].toFixed(3);
+      document.getElementById('tdRmse').textContent=rmseTD_hist[rmseTD_hist.length-1].toFixed(3);
+      updateChart();
+      animRunning=false;
+      setStatus(`<b>에피소드 ${episodeCount} 완료</b> — ${animTrajectory.length} 스텝`, 'done');
+      if(onDone) onDone();
+      return;
+    }
+
+    const {r,c,nr,nc,reward}=animTrajectory[animStep];
+    // TD update this step
+    const isGoal=nr===GOAL_R&&nc===GOAL_C;
+    const target=reward+(isGoal?0:gamma*V_td[nr][nc]);
+    V_td[r][c]+=ALPHA*(target-V_td[r][c]);
+
+    // Update TD grid (show agent at new pos)
+    renderGrid('gridTD',V_td,[nr,nc],[[r,c]]);
+    flashCell('gridTD',r,c);
+
+    // MC grid stays frozen (show agent position but no value updates)
+    renderGrid('gridMC',V_mc,[nr,nc],null);
+
+    setStatus(`<b>에피소드 ${episodeCount}</b> — 스텝 ${animStep+1}/${animTrajectory.length} | 위치 (${r},${c})→(${nr},${nc}) r=${reward}`, 'running');
+
+    animStep++;
+    // delay based on step count (faster for long episodes)
+    const delay = Math.max(30, Math.min(200, 800/animTrajectory.length));
+    setTimeout(step, delay);
+  }
+  step();
+}
+
+// ── Auto-run loop ──────────────────────────────────────────
+function autoRun(){
+  if(!running) return;
+  const s = parseInt(document.getElementById('speedSlider').value);
+  if(s>=5){
+    // Fast mode: batch without animation
+    doEpisodes(s);
+    setStatus(`<b>에피소드 ${episodeCount}</b> 완료 — RMSE MC:${rmseMC_hist[rmseMC_hist.length-1].toFixed(3)} TD:${rmseTD_hist[rmseTD_hist.length-1].toFixed(3)}`, 'done');
+    runTimer=setTimeout(autoRun,50);
+  } else if(s>=2){
+    doEpisodes(s);
+    setStatus(`<b>에피소드 ${episodeCount}</b> 완료 — RMSE MC:${rmseMC_hist[rmseMC_hist.length-1].toFixed(3)} TD:${rmseTD_hist[rmseTD_hist.length-1].toFixed(3)}`, 'done');
+    runTimer=setTimeout(autoRun,100);
+  } else {
+    // Animated single episode
+    startAnimEpisode(()=>{
+      if(running) runTimer=setTimeout(autoRun,300);
+    });
+  }
+}
+
+function stopRunning(){
+  running=false;
+  animRunning=false;
+  clearTimeout(runTimer);
+  document.getElementById('btnRun').textContent='▶ 실행';
+  document.getElementById('btnRun').classList.remove('primary');
+  document.getElementById('frozenOverlay').classList.remove('visible');
+}
+
+// ── Event listeners ────────────────────────────────────────
+document.getElementById('gammaSlider').addEventListener('input',function(){
+  document.getElementById('gammaVal').textContent=parseFloat(this.value).toFixed(2);
+});
+document.getElementById('speedSlider').addEventListener('input',function(){
+  document.getElementById('speedVal').textContent=this.value;
+});
+
+document.getElementById('btnRun').addEventListener('click',function(){
+  if(running){
+    stopRunning();
+    setStatus('일시 정지.', '');
+  } else {
+    running=true;
+    this.textContent='⏸ 정지';
+    this.classList.add('primary');
+    autoRun();
+  }
+});
+
+document.getElementById('btn1ep').addEventListener('click',function(){
+  if(animRunning) return;
+  stopRunning();
+  startAnimEpisode(null);
+});
+
+document.getElementById('btn10ep').addEventListener('click',function(){
+  if(animRunning) return;
+  stopRunning();
+  doEpisodes(10);
+  setStatus(`<b>에피소드 ${episodeCount}</b> 완료 (10 추가)`, 'done');
+});
+
+document.getElementById('btn100ep').addEventListener('click',function(){
+  if(animRunning) return;
+  stopRunning();
+  doEpisodes(100);
+  setStatus(`<b>에피소드 ${episodeCount}</b> 완료 (100 추가)`, 'done');
+});
+
+document.getElementById('btnReset').addEventListener('click',function(){
+  stopRunning();
+  resetAll();
+});
+
+// ── Boot ──────────────────────────────────────────────────
+initChart();
+resetAll();
+</script>
+
+<!-- iframe resize -->
+<script>
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
+</body>
+</html>

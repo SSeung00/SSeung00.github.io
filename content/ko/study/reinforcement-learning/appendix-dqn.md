@@ -1,8 +1,8 @@
 ---
-title: "Unit 5 — 표를 버리고 신경망으로: DQN"
+title: "부록 — 표를 버리고 신경망으로: DQN (참고용)"
 date: 2026-04-13
 category: "Reinforcement Learning"
-weight: 6
+weight: 99
 ---
 
 ## [Hook] Q-table의 벽

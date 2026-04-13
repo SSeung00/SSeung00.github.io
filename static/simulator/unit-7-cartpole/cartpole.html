@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CartPole — Tabular의 한계</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+  --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+  --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+  --font-mono: 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 16px;
+  min-width: 520px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 14px;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Canvas area */
+.canvas-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 12px;
+  position: relative;
+}
+canvas#cartpole {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border-radius: 4px;
+}
+.state-display {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.state-val { color: var(--accent); }
+.episode-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Controls */
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 7px 16px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--border); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #5a7aad; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger:hover { background: #aa5a5a; }
+.btn-action {
+  font-size: 18px;
+  padding: 10px 24px;
+  min-width: 110px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.1s;
+}
+.btn-action:hover, .btn-action:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-action.pressed { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.score-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  min-width: 120px;
+}
+.score-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.score-value { font-size: 20px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+.score-value.best { color: var(--success); }
+
+.hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+kbd {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* Agent tab */
+.agent-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.agent-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+}
+.agent-stat .label { font-size: 11px; color: var(--text-muted); }
+.agent-stat .val { font-size: 18px; font-weight: 700; color: var(--success); font-family: var(--font-mono); }
+
+/* Collapsible */
+.collapsible {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.collapsible-header {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 10px 14px;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.collapsible-header:hover { background: var(--surface-2); }
+.collapsible-arrow { color: var(--text-muted); transition: transform 0.2s; }
+.collapsible-body {
+  display: none;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.collapsible.open .collapsible-arrow { transform: rotate(180deg); }
+.collapsible.open .collapsible-body { display: block; }
+code {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-2);
+}
+
+/* State scatter */
+.scatter-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.scatter-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+#scatterChart {
+  display: block;
+  width: 100% !important;
+  height: 150px !important;
+}
+
+/* Info card */
+.info-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.info-card h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
+  margin-bottom: 8px;
+}
+.calc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.calc-label { color: var(--text-muted); min-width: 200px; }
+.calc-val { font-family: var(--font-mono); color: var(--accent-2); font-weight: 700; }
+.info-conclusion {
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+/* Failure flash overlay */
+.fail-msg {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(191,108,108,0.92);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius);
+  padding: 8px 18px;
+  pointer-events: none;
+  z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<h2>CartPole — Tabular의 한계</h2>
+<p class="subtitle">연속 상태 공간에서는 Q-테이블이 불가능합니다. 이것이 Deep RL의 출발점입니다.</p>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('manual')">직접 조종</button>
+  <button class="tab-btn" onclick="switchTab('agent')">자동 에이전트</button>
+</div>
+
+<!-- Canvas (shared) -->
+<div class="canvas-wrap">
+  <canvas id="cartpole" width="500" height="180"></canvas>
+  <div class="episode-badge" id="episodeBadge">에피소드 #1</div>
+  <div class="fail-msg" id="failMsg">실패!</div>
+  <div class="state-display">
+    <span>위치 x: <span class="state-val" id="dispX">0.00</span></span>
+    <span>속도 ẋ: <span class="state-val" id="dispXdot">0.00</span></span>
+    <span>각도 θ: <span class="state-val" id="dispTheta">0.00°</span></span>
+    <span>각속도 θ̇: <span class="state-val" id="dispThetaDot">0.00</span></span>
+  </div>
+</div>
+
+<!-- Manual Tab -->
+<div class="tab-panel active" id="tab-manual">
+  <p class="hint">키보드 <kbd>←</kbd> <kbd>→</kbd> 또는 아래 버튼으로 조종하세요.</p>
+  <div class="controls-row">
+    <button class="btn-action" id="btnLeft" onmousedown="setAction(0)" onmouseup="clearAction()" ontouchstart="setAction(0)" ontouchend="clearAction()">← 왼쪽</button>
+    <button class="btn-action" id="btnRight" onmousedown="setAction(1)" onmouseup="clearAction()" ontouchstart="setAction(1)" ontouchend="clearAction()">오른쪽 →</button>
+    <button class="btn" onclick="resetManual()">↺ 리셋</button>
+  </div>
+  <div class="score-row">
+    <div class="score-card">
+      <div class="score-label">현재 기록</div>
+      <div class="score-value" id="manualTime">0.0초</div>
+    </div>
+    <div class="score-card">
+      <div class="score-label">최고 기록</div>
+      <div class="score-value best" id="manualBest">0.0초</div>
+    </div>
+    <div class="score-card">
+      <div class="score-label">스텝</div>
+      <div class="score-value" id="manualSteps">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- Agent Tab -->
+<div class="tab-panel" id="tab-agent">
+  <div class="agent-row">
+    <button class="btn primary" id="btnAgentStart" onclick="toggleAgent()">▶ 시작</button>
+    <div class="agent-stat">
+      <div class="label">현재 스텝</div>
+      <div class="val" id="agentSteps">0</div>
+    </div>
+    <div class="agent-stat">
+      <div class="label">최고 스텝</div>
+      <div class="val" id="agentBest">0</div>
+    </div>
+    <div class="agent-stat">
+      <div class="label">에피소드</div>
+      <div class="val" id="agentEp">0</div>
+    </div>
+  </div>
+  <div class="collapsible" id="whyCollapse">
+    <button class="collapsible-header" onclick="toggleCollapse('whyCollapse')">
+      왜 이 에이전트가 작동하나요?
+      <span class="collapsible-arrow">▾</span>
+    </button>
+    <div class="collapsible-body">
+      이 에이전트는 신경망 없이 작동하는 <strong>선형 정책(linear policy)</strong> 입니다.<br><br>
+      결정 규칙: <code>score = θ × 4 + θ̇ × 1.5 + x × 0.1 + ẋ × 0.1</code><br>
+      score &gt; 0 이면 오른쪽, 아니면 왼쪽으로 밀어냅니다.<br><br>
+      <strong>핵심 아이디어:</strong> 막대가 오른쪽으로 기울면(θ &gt; 0) → 오른쪽으로 밀어 따라가고,
+      왼쪽으로 기울면 왼쪽으로 밀어 균형을 잡습니다.<br><br>
+      이 단순한 규칙이 수백 스텝 이상 작동할 수 있습니다. 하지만 이것은
+      <em>수작업으로 설계된 규칙</em>이지, 환경에서 <em>학습된</em> 것이 아닙니다.
+      DQN과 같은 Deep RL은 신경망이 이런 가중치를 스스로 발견합니다.
+    </div>
+  </div>
+</div>
+
+<!-- State scatter (always visible) -->
+<div class="scatter-wrap">
+  <div class="scatter-title">방문한 상태들 (연속 공간) — θ vs x</div>
+  <canvas id="scatterChart"></canvas>
+</div>
+
+<!-- Info card -->
+<div class="info-card">
+  <h3>왜 Q-table이 불가능한가?</h3>
+  <div class="calc-row">
+    <span class="calc-label">상태 변수 수:</span>
+    <span class="calc-val">4개</span>
+    <span style="color:var(--text-muted); font-size:12px;">(x, ẋ, θ, θ̇ — 모두 연속값)</span>
+  </div>
+  <div class="calc-row">
+    <span class="calc-label">각 변수를 100 구간으로 이산화:</span>
+    <span class="calc-val">100⁴ = 1억 개</span>
+    <span style="color:var(--text-muted); font-size:12px;">상태</span>
+  </div>
+  <div class="calc-row">
+    <span class="calc-label">1000 구간으로 이산화:</span>
+    <span class="calc-val">1000⁴ = 1조 개</span>
+    <span style="color:var(--text-muted); font-size:12px;">상태</span>
+  </div>
+  <div class="info-conclusion">
+    이산화 해상도를 높일수록 테이블 크기가 기하급수적으로 증가합니다 (<strong>차원의 저주</strong>).
+    실용적으로 불가능합니다. <strong>신경망이 필요합니다.</strong><br>
+    DQN은 이 연속 4차원 상태를 입력으로 받아 Q값을 직접 근사합니다.
+  </div>
+</div>
+
+<script>
+// ─── Auto-resize ───────────────────────────────────────────────
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+
+// ─── CartPole Physics ──────────────────────────────────────────
+const GRAVITY = 9.8, MASSCART = 1.0, MASSPOLE = 0.1;
+const TOTAL_MASS = 1.1, LENGTH = 0.5, POLEMASS_LENGTH = 0.05;
+const FORCE_MAG = 10.0, TAU = 0.02;
+const X_LIMIT = 2.4, THETA_LIMIT = 0.2094; // 12 degrees
+const MAX_STEPS = 500;
+
+function makeState() {
+  return {
+    x: (Math.random() - 0.5) * 0.1,
+    x_dot: (Math.random() - 0.5) * 0.1,
+    theta: (Math.random() - 0.5) * 0.1,
+    theta_dot: (Math.random() - 0.5) * 0.1
+  };
+}
+
+function physicsStep(state, action) {
+  const force = action === 1 ? FORCE_MAG : -FORCE_MAG;
+  const { x, x_dot, theta, theta_dot } = state;
+  const costheta = Math.cos(theta);
+  const sintheta = Math.sin(theta);
+  const temp = (force + POLEMASS_LENGTH * theta_dot * theta_dot * sintheta) / TOTAL_MASS;
+  const thetaacc = (GRAVITY * sintheta - costheta * temp) /
+    (LENGTH * (4/3 - MASSPOLE * costheta * costheta / TOTAL_MASS));
+  const xacc = temp - POLEMASS_LENGTH * thetaacc * costheta / TOTAL_MASS;
+
+  return {
+    x: x + TAU * (x_dot + TAU * xacc),
+    x_dot: x_dot + TAU * xacc,
+    theta: theta + TAU * (theta_dot + TAU * thetaacc),
+    theta_dot: theta_dot + TAU * thetaacc
+  };
+}
+
+function isDone(state, step) {
+  return Math.abs(state.x) > X_LIMIT ||
+         Math.abs(state.theta) > THETA_LIMIT ||
+         step >= MAX_STEPS;
+}
+
+// ─── Canvas Rendering ──────────────────────────────────────────
+const canvas = document.getElementById('cartpole');
+const ctx = canvas.getContext('2d');
+
+// Resize canvas to match CSS display size
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width || 500;
+  canvas.height = rect.height || 180;
+}
+window.addEventListener('resize', () => { resizeCanvas(); });
+resizeCanvas();
+
+function render(state, failed) {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0f1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // Track
+  const trackY = H * 0.78;
+  ctx.strokeStyle = '#2e3146';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, trackY);
+  ctx.lineTo(W - 20, trackY);
+  ctx.stroke();
+
+  // Track end markers
+  ctx.strokeStyle = '#3a3f5a';
+  ctx.lineWidth = 1;
+  const leftBound = W/2 + (-X_LIMIT) * 50 * (W/500);
+  const rightBound = W/2 + (X_LIMIT) * 50 * (W/500);
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(leftBound, trackY - 30); ctx.lineTo(leftBound, trackY + 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rightBound, trackY - 30); ctx.lineTo(rightBound, trackY + 6); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Scale factor
+  const scale = 50 * (W / 500);
+  const cx = W / 2 + state.x * scale;
+  const cartW = 50 * (W / 500);
+  const cartH = 20;
+  const cartTop = trackY - cartH;
+
+  // Cart shadow
+  ctx.fillStyle = 'rgba(108,142,191,0.15)';
+  ctx.fillRect(cx - cartW/2 + 2, cartTop + 3, cartW, cartH);
+
+  // Cart body
+  ctx.fillStyle = failed ? '#bf6c6c' : '#6c8ebf';
+  ctx.beginPath();
+  ctx.roundRect(cx - cartW/2, cartTop, cartW, cartH, 4);
+  ctx.fill();
+
+  // Cart wheels
+  ctx.fillStyle = '#1a1d27';
+  ctx.beginPath(); ctx.arc(cx - cartW/2 + 10, trackY + 3, 5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + cartW/2 - 10, trackY + 3, 5, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#2e3146'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx - cartW/2 + 10, trackY + 3, 5, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + cartW/2 - 10, trackY + 3, 5, 0, Math.PI*2); ctx.stroke();
+
+  // Pole
+  const poleLen = 80 * (W / 500);
+  const px = cx + Math.sin(state.theta) * poleLen;
+  const py = cartTop - Math.cos(state.theta) * poleLen;
+
+  // Pole shadow
+  ctx.strokeStyle = 'rgba(191,140,108,0.15)';
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(cx + 1, cartTop + 1); ctx.lineTo(px + 1, py + 1); ctx.stroke();
+
+  ctx.strokeStyle = failed ? '#bf4444' : '#bf8c6c';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx, cartTop);
+  ctx.lineTo(px, py);
+  ctx.stroke();
+
+  // Pole tip
+  ctx.fillStyle = failed ? '#bf4444' : '#bf8c6c';
+  ctx.beginPath();
+  ctx.arc(px, py, 6 * (W/500), 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pole base pivot
+  ctx.fillStyle = '#1a1d27';
+  ctx.beginPath();
+  ctx.arc(cx, cartTop, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── State display ─────────────────────────────────────────────
+function updateStateDisplay(state) {
+  document.getElementById('dispX').textContent = state.x.toFixed(2);
+  document.getElementById('dispXdot').textContent = state.x_dot.toFixed(2);
+  document.getElementById('dispTheta').textContent = (state.theta * 180 / Math.PI).toFixed(1) + '°';
+  document.getElementById('dispThetaDot').textContent = state.theta_dot.toFixed(2);
+}
+
+// ─── Scatter chart ─────────────────────────────────────────────
+const MAX_SCATTER = 200;
+let scatterPoints = [];
+let scatterChart = null;
+
+function initScatter() {
+  const sctx = document.getElementById('scatterChart').getContext('2d');
+  scatterChart = new Chart(sctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: '상태',
+        data: [],
+        pointRadius: 3,
+        pointBackgroundColor: [],
+        pointBorderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'x (위치)', color: '#8892a4', font: { size: 11 } },
+          min: -2.5, max: 2.5,
+          grid: { color: '#2e3146' },
+          ticks: { color: '#8892a4', font: { size: 10 }, maxTicksLimit: 5 }
+        },
+        y: {
+          title: { display: true, text: 'θ (각도 rad)', color: '#8892a4', font: { size: 11 } },
+          min: -0.22, max: 0.22,
+          grid: { color: '#2e3146' },
+          ticks: { color: '#8892a4', font: { size: 10 }, maxTicksLimit: 5 }
+        }
+      }
+    }
+  });
+}
+
+function addScatterPoint(state) {
+  scatterPoints.push({ x: state.x, theta: state.theta });
+  if (scatterPoints.length > MAX_SCATTER) scatterPoints.shift();
+
+  const n = scatterPoints.length;
+  const data = scatterPoints.map(p => ({ x: p.x, y: p.theta }));
+  const colors = scatterPoints.map((_, i) => {
+    const t = i / Math.max(n - 1, 1);
+    const r = Math.round(108 + t * (191 - 108));
+    const g = Math.round(142 - t * (142 - 140));
+    const b = Math.round(191 - t * (191 - 108));
+    return `rgba(${r},${g},${b},${0.4 + t * 0.6})`;
+  });
+
+  scatterChart.data.datasets[0].data = data;
+  scatterChart.data.datasets[0].pointBackgroundColor = colors;
+  scatterChart.update('none');
+}
+
+// ─── Tab switching ─────────────────────────────────────────────
+let currentTab = 'manual';
+
+function switchTab(tab) {
+  if (currentTab === tab) return;
+
+  // Stop agent if switching away
+  if (currentTab === 'agent' && agentRunning) stopAgent();
+  // Stop manual loop
+  if (manualRafId) cancelAnimationFrame(manualRafId);
+
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'manual') || (i === 1 && tab === 'agent'));
+  });
+  document.getElementById('tab-manual').classList.toggle('active', tab === 'manual');
+  document.getElementById('tab-agent').classList.toggle('active', tab === 'agent');
+
+  if (tab === 'manual') startManualLoop();
+  else startAgentLoop();
+}
+
+// ─── Manual mode ───────────────────────────────────────────────
+let manualState = makeState();
+let manualAction = null;
+let manualStep = 0;
+let manualEpisode = 1;
+let manualBest = 0;
+let manualRafId = null;
+let manualFailed = false;
+let manualFailTimer = 0;
+const STEPS_PER_FRAME = 1;
+const FRAME_DELAY_MS = 20; // ~50fps physics
+let manualLastTime = 0;
+
+function setAction(a) {
+  manualAction = a;
+  document.getElementById('btnLeft').classList.toggle('pressed', a === 0);
+  document.getElementById('btnRight').classList.toggle('pressed', a === 1);
+}
+function clearAction() {
+  manualAction = null;
+  document.getElementById('btnLeft').classList.remove('pressed');
+  document.getElementById('btnRight').classList.remove('pressed');
+}
+
+function resetManual() {
+  manualState = makeState();
+  manualStep = 0;
+  manualFailed = false;
+  manualFailTimer = 0;
+  document.getElementById('failMsg').style.display = 'none';
+  document.getElementById('manualTime').textContent = '0.0초';
+  document.getElementById('manualSteps').textContent = '0';
+}
+
+function manualLoop(ts) {
+  if (currentTab !== 'manual') return;
+
+  if (ts - manualLastTime < FRAME_DELAY_MS) {
+    manualRafId = requestAnimationFrame(manualLoop);
+    return;
+  }
+  manualLastTime = ts;
+
+  if (manualFailed) {
+    manualFailTimer++;
+    if (manualFailTimer > 40) {
+      manualEpisode++;
+      document.getElementById('episodeBadge').textContent = `에피소드 #${manualEpisode}`;
+      document.getElementById('failMsg').style.display = 'none';
+      manualState = makeState();
+      manualStep = 0;
+      manualFailed = false;
+      manualFailTimer = 0;
+    }
+  } else {
+    const action = manualAction !== null ? manualAction : (Math.random() < 0.5 ? 0 : 1);
+    // don't auto-apply if no input — stay still but still update physics
+    if (manualAction !== null) {
+      manualState = physicsStep(manualState, action);
+    } else {
+      // apply no force: use action 0 or 1 randomly to simulate no push — actually apply 0 force
+      // We simulate "no input" as very small force (friction):
+      manualState = physicsStep(manualState, Math.random() < 0.5 ? 0 : 1);
+      // Better: truly no force — use custom step
+      manualState = physicsStepNoForce(manualState);
+    }
+    manualStep++;
+
+    const elapsed = (manualStep * TAU).toFixed(1);
+    document.getElementById('manualTime').textContent = elapsed + '초';
+    document.getElementById('manualSteps').textContent = manualStep;
+
+    if (isDone(manualState, manualStep)) {
+      manualFailed = true;
+      manualFailTimer = 0;
+      document.getElementById('failMsg').style.display = 'block';
+      const t = parseFloat(elapsed);
+      if (t > manualBest) {
+        manualBest = t;
+        document.getElementById('manualBest').textContent = t.toFixed(1) + '초';
+      }
+    }
+
+    addScatterPoint(manualState);
+  }
+
+  render(manualState, manualFailed);
+  updateStateDisplay(manualState);
+  manualRafId = requestAnimationFrame(manualLoop);
+}
+
+function physicsStepNoForce(state) {
+  const force = 0;
+  const { x, x_dot, theta, theta_dot } = state;
+  const costheta = Math.cos(theta);
+  const sintheta = Math.sin(theta);
+  const temp = (force + POLEMASS_LENGTH * theta_dot * theta_dot * sintheta) / TOTAL_MASS;
+  const thetaacc = (GRAVITY * sintheta - costheta * temp) /
+    (LENGTH * (4/3 - MASSPOLE * costheta * costheta / TOTAL_MASS));
+  const xacc = temp - POLEMASS_LENGTH * thetaacc * costheta / TOTAL_MASS;
+  return {
+    x: x + TAU * (x_dot + TAU * xacc),
+    x_dot: x_dot + TAU * xacc,
+    theta: theta + TAU * (theta_dot + TAU * thetaacc),
+    theta_dot: theta_dot + TAU * thetaacc
+  };
+}
+
+function startManualLoop() {
+  resetManual();
+  if (manualRafId) cancelAnimationFrame(manualRafId);
+  manualRafId = requestAnimationFrame(manualLoop);
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') { e.preventDefault(); setAction(0); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); setAction(1); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') clearAction();
+});
+
+// ─── Agent mode ────────────────────────────────────────────────
+let agentState = makeState();
+let agentStep = 0;
+let agentEpisode = 0;
+let agentBestSteps = 0;
+let agentRunning = false;
+let agentRafId = null;
+let agentFailed = false;
+let agentFailTimer = 0;
+let agentLastTime = 0;
+
+function agentAction(state) {
+  const score = state.theta * 4 + state.theta_dot * 1.5 + state.x * 0.1 + state.x_dot * 0.1;
+  return score > 0 ? 1 : 0;
+}
+
+function toggleAgent() {
+  if (agentRunning) stopAgent();
+  else startAgent();
+}
+
+function startAgent() {
+  agentRunning = true;
+  agentState = makeState();
+  agentStep = 0;
+  agentEpisode = 0;
+  agentBestSteps = 0;
+  agentFailed = false;
+  agentFailTimer = 0;
+  document.getElementById('btnAgentStart').textContent = '⏹ 정지';
+  document.getElementById('btnAgentStart').classList.add('danger');
+  document.getElementById('btnAgentStart').classList.remove('primary');
+  agentRafId = requestAnimationFrame(agentLoop);
+}
+
+function stopAgent() {
+  agentRunning = false;
+  if (agentRafId) cancelAnimationFrame(agentRafId);
+  document.getElementById('btnAgentStart').textContent = '▶ 시작';
+  document.getElementById('btnAgentStart').classList.remove('danger');
+  document.getElementById('btnAgentStart').classList.add('primary');
+}
+
+function agentLoop(ts) {
+  if (!agentRunning) return;
+
+  if (ts - agentLastTime < FRAME_DELAY_MS) {
+    agentRafId = requestAnimationFrame(agentLoop);
+    return;
+  }
+  agentLastTime = ts;
+
+  if (agentFailed) {
+    agentFailTimer++;
+    if (agentFailTimer > 30) {
+      agentEpisode++;
+      agentState = makeState();
+      agentStep = 0;
+      agentFailed = false;
+      agentFailTimer = 0;
+      document.getElementById('failMsg').style.display = 'none';
+      document.getElementById('episodeBadge').textContent = `에피소드 #${agentEpisode}`;
+    }
+  } else {
+    const action = agentAction(agentState);
+    agentState = physicsStep(agentState, action);
+    agentStep++;
+
+    document.getElementById('agentSteps').textContent = agentStep;
+    document.getElementById('agentEp').textContent = agentEpisode + 1;
+
+    if (isDone(agentState, agentStep)) {
+      agentFailed = true;
+      agentFailTimer = 0;
+      document.getElementById('failMsg').style.display = 'block';
+      if (agentStep > agentBestSteps) {
+        agentBestSteps = agentStep;
+        document.getElementById('agentBest').textContent = agentBestSteps;
+      }
+    }
+
+    addScatterPoint(agentState);
+  }
+
+  render(agentState, agentFailed);
+  updateStateDisplay(agentState);
+  agentRafId = requestAnimationFrame(agentLoop);
+}
+
+function startAgentLoop() {
+  agentState = makeState();
+  render(agentState, false);
+  updateStateDisplay(agentState);
+}
+
+// ─── Collapsible ───────────────────────────────────────────────
+function toggleCollapse(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ─── Init ──────────────────────────────────────────────────────
+initScatter();
+startManualLoop();
+</script>
+</body>
+</html>

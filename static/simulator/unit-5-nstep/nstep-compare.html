@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>n-step TD — 얼마나 앞을 봐야 최적인가?</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface-2: #252836;
+  --border: #2e3146; --text: #e2e8f0; --text-muted: #8892a4;
+  --accent: #6c8ebf; --accent-2: #bf8c6c; --success: #6cbf8e; --danger: #bf6c6c;
+  --font-mono: 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  padding: 20px;
+  min-height: 100vh;
+}
+h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.slider-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  min-width: 100px;
+}
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding: 0 2px;
+}
+input[type=range] {
+  flex: 1;
+  min-width: 160px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.n-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  min-width: 90px;
+  text-align: center;
+}
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+button:hover { border-color: var(--accent); background: #2a2f44; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: #7a9dcf; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.status-box {
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-height: 32px;
+}
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.stat-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.chart-container {
+  position: relative;
+  height: 320px;
+  margin-top: 4px;
+}
+.legend-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 0.78rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-dot {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+.section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+</style>
+</head>
+<body>
+
+<h1>n-step TD — 얼마나 앞을 봐야 최적인가?</h1>
+<p class="subtitle">4×4 Gridworld에서 n=1(TD(0))부터 n=20(≈MC)까지 동시에 학습하며 RMSE 수렴 속도를 비교합니다.</p>
+
+<div class="card">
+  <div class="section-title">n 값 선택 (강조할 선)</div>
+  <div class="slider-row">
+    <span class="slider-label">n-step 수:</span>
+    <div style="flex:1; min-width:160px;">
+      <input type="range" id="nSlider" min="1" max="20" value="4" step="1">
+      <div class="slider-labels"><span>n=1 TD(0)</span><span>n=20 ≈MC</span></div>
+    </div>
+    <div class="n-display" id="nDisplay">현재 n = 4</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-title">컨트롤</div>
+  <div class="controls">
+    <button class="primary" id="btnRun">▶ Run</button>
+    <button id="btn100">+100 ep</button>
+    <button id="btn500">+500 ep</button>
+    <button id="btnReset">↺ Reset</button>
+  </div>
+  <div class="status-box" id="statusBox" style="margin-top:10px;">초기화 완료. Run을 눌러 시작하세요.</div>
+</div>
+
+<div class="card">
+  <div class="section-title">RMSE 수렴 곡선 (n = 1, 2, 4, 8, 16)</div>
+  <div class="chart-container">
+    <canvas id="rmseChart"></canvas>
+  </div>
+  <div class="legend-row" id="legendRow"></div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value" id="statEpisodes">0</div>
+    <div class="stat-label">에피소드 수</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="statBestN">—</div>
+    <div class="stat-label">현재 최저 RMSE n</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="statRMSE">—</div>
+    <div class="stat-label">선택된 n의 RMSE</div>
+  </div>
+</div>
+
+<script>
+// ─── Environment ───────────────────────────────────────────────────────────
+const GRID = 4, GOAL = 15, GAMMA = 0.9, REWARD = -1;
+const ACTIONS = [[-1,0],[1,0],[0,-1],[0,1]]; // up, down, left, right
+const N_VALUES = [1, 2, 4, 8, 16];
+const COLORS = ['#bf6c6c','#bf8c6c','#6cbf8e','#6c8ebf','#b06cbf'];
+const ALPHA = 0.05;
+
+function stateToRC(s){ return [Math.floor(s/GRID), s%GRID]; }
+function rcToState(r,c){ return r*GRID+c; }
+
+function step(s, a){
+  if(s === GOAL) return {ns: s, r: 0, done: true};
+  let [r,c] = stateToRC(s);
+  let [dr,dc] = ACTIONS[a];
+  let nr = Math.max(0, Math.min(GRID-1, r+dr));
+  let nc = Math.max(0, Math.min(GRID-1, c+dc));
+  let ns = rcToState(nr,nc);
+  let done = ns === GOAL;
+  return {ns, r: REWARD, done};
+}
+
+// ─── True Value via Bellman iteration ──────────────────────────────────────
+function computeTrueV(){
+  let V = new Float64Array(GRID*GRID);
+  for(let iter=0; iter<2000; iter++){
+    let newV = new Float64Array(GRID*GRID);
+    for(let s=0; s<GRID*GRID; s++){
+      if(s===GOAL){ newV[s]=0; continue; }
+      let sum = 0;
+      for(let a=0; a<4; a++){
+        let {ns,r} = step(s,a);
+        sum += 0.25*(r + GAMMA*V[ns]);
+      }
+      newV[s] = sum;
+    }
+    V = newV;
+  }
+  return V;
+}
+
+// ─── RMSE helper ───────────────────────────────────────────────────────────
+function rmse(V, trueV){
+  let sum = 0;
+  for(let s=0; s<GRID*GRID; s++) sum += (V[s]-trueV[s])**2;
+  return Math.sqrt(sum/(GRID*GRID));
+}
+
+// ─── Seeded random (mulberry32) ────────────────────────────────────────────
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let trueV, vTables, rmseHistory, episodes;
+let running = false, animId = null;
+
+function init(){
+  trueV = computeTrueV();
+  vTables = N_VALUES.map(() => new Float64Array(GRID*GRID));
+  rmseHistory = N_VALUES.map(() => [rmse(new Float64Array(GRID*GRID), trueV)]);
+  episodes = 0;
+  updateStats();
+  updateChart();
+  setStatus('초기화 완료. Run을 눌러 시작하세요.');
+}
+
+// ─── n-step TD Episode ─────────────────────────────────────────────────────
+function runEpisode(V, n, rng){
+  // Generate full trajectory first (random policy)
+  let states = [], rewards = [];
+  let s = 0;
+  states.push(s);
+  let maxSteps = 200;
+  while(s !== GOAL && states.length <= maxSteps){
+    let a = Math.floor(rng()*4);
+    let {ns,r,done} = step(s,a);
+    rewards.push(r);
+    states.push(ns);
+    s = ns;
+    if(done) break;
+  }
+  let T = rewards.length; // number of transitions
+
+  // n-step TD updates
+  for(let t=0; t<T; t++){
+    let tauEnd = Math.min(t+n, T);
+    // G = sum of rewards from t+1 to tauEnd + bootstrap
+    let G = 0;
+    for(let i=t; i<tauEnd; i++){
+      G += Math.pow(GAMMA, i-t) * rewards[i];
+    }
+    if(tauEnd < T){
+      G += Math.pow(GAMMA, n) * V[states[tauEnd]];
+    }
+    V[states[t]] += ALPHA * (G - V[states[t]]);
+  }
+}
+
+function runBatchEpisodes(count){
+  for(let ep=0; ep<count; ep++){
+    let seed = episodes * 7919 + 1;
+    N_VALUES.forEach((n, i) => {
+      let rng = mulberry32(seed);
+      runEpisode(vTables[i], n, rng);
+    });
+    episodes++;
+    if(episodes % 10 === 0 || episodes <= 10){
+      N_VALUES.forEach((n,i) => {
+        rmseHistory[i].push(rmse(vTables[i], trueV));
+      });
+    }
+  }
+  // ensure last point recorded
+  N_VALUES.forEach((n,i) => {
+    let last = rmseHistory[i][rmseHistory[i].length-1];
+    // already pushed in loop above
+  });
+}
+
+// ─── Chart ─────────────────────────────────────────────────────────────────
+let chart = null;
+
+function buildLabels(){
+  // approximate episode numbers from rmseHistory[0]
+  let len = rmseHistory[0].length;
+  let labels = [];
+  for(let i=0; i<len; i++){
+    if(i === 0) labels.push(0);
+    else if(i*10 <= 100) labels.push(i*10);
+    else labels.push(i*10);
+  }
+  return labels;
+}
+
+function updateChart(){
+  let selectedN = parseInt(document.getElementById('nSlider').value);
+  let labels = buildLabels();
+
+  let datasets = N_VALUES.map((n,i) => {
+    let isSelected = n === selectedN;
+    return {
+      label: `n=${n}`,
+      data: rmseHistory[i],
+      borderColor: COLORS[i],
+      backgroundColor: 'transparent',
+      borderWidth: isSelected ? 3.5 : 1.5,
+      pointRadius: 0,
+      tension: 0.3,
+      borderDash: isSelected ? [] : [],
+      order: isSelected ? 0 : 1,
+      // make selected line pop
+      ...(isSelected ? {borderColor: lighten(COLORS[i], 0.3)} : {opacity: 0.6})
+    };
+  });
+
+  if(!chart){
+    let ctx = document.getElementById('rmseChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1d27',
+            borderColor: '#2e3146',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#8892a4',
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: '에피소드', color: '#8892a4', font:{size:11} },
+            ticks: { color: '#8892a4', maxTicksLimit: 10,
+              callback: function(val,idx){ return this.getLabelForValue(val); }
+            },
+            grid: { color: '#2e3146' }
+          },
+          y: {
+            title: { display: true, text: 'RMSE (vs 참값)', color: '#8892a4', font:{size:11} },
+            ticks: { color: '#8892a4' },
+            grid: { color: '#2e3146' },
+            min: 0
+          }
+        }
+      }
+    });
+  } else {
+    chart.data.labels = labels;
+    chart.data.datasets = datasets;
+    chart.update('none');
+  }
+  buildLegend(selectedN);
+}
+
+function lighten(hex, amt){
+  // simple lighten: shift toward white
+  let c = parseInt(hex.slice(1),16);
+  let r = Math.min(255, (c>>16) + Math.round(amt*80));
+  let g = Math.min(255, ((c>>8)&0xff) + Math.round(amt*80));
+  let b = Math.min(255, (c&0xff) + Math.round(amt*80));
+  return `rgb(${r},${g},${b})`;
+}
+
+function buildLegend(selectedN){
+  let row = document.getElementById('legendRow');
+  row.innerHTML = '';
+  N_VALUES.forEach((n,i) => {
+    let div = document.createElement('div');
+    div.className = 'legend-item';
+    let bold = n === selectedN;
+    div.innerHTML = `<div class="legend-dot" style="background:${COLORS[i]};height:${bold?4:2}px;"></div>
+      <span style="color:${bold?'var(--text)':'var(--text-muted)'};font-weight:${bold?700:400}">
+        n=${n}${n===1?' (TD(0))':n===16?' (≈MC)':''}
+      </span>`;
+    row.appendChild(div);
+  });
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────
+function updateStats(){
+  let selectedN = parseInt(document.getElementById('nSlider').value);
+  let idx = N_VALUES.indexOf(selectedN);
+  if(idx < 0) idx = 2; // fallback to n=4
+
+  document.getElementById('statEpisodes').textContent = episodes;
+
+  // best n = lowest final RMSE
+  let finals = N_VALUES.map((_,i) => {
+    let h = rmseHistory[i];
+    return h[h.length-1];
+  });
+  let bestIdx = finals.indexOf(Math.min(...finals));
+  document.getElementById('statBestN').textContent = `n=${N_VALUES[bestIdx]}`;
+
+  let curRMSE = rmseHistory[idx];
+  document.getElementById('statRMSE').textContent =
+    curRMSE.length > 0 ? curRMSE[curRMSE.length-1].toFixed(3) : '—';
+}
+
+function setStatus(msg){
+  document.getElementById('statusBox').textContent = msg;
+}
+
+// ─── Run loop ──────────────────────────────────────────────────────────────
+let totalTarget = 0;
+
+function runAnimated(target){
+  totalTarget = target;
+  if(running) return;
+  running = true;
+  document.getElementById('btnRun').textContent = '⏸ Pause';
+  document.getElementById('btnRun').classList.add('primary');
+
+  function tick(){
+    if(!running) return;
+    let batch = Math.min(10, totalTarget - episodes);
+    if(batch <= 0){
+      running = false;
+      document.getElementById('btnRun').textContent = '▶ Run';
+      setStatus(`완료! ${episodes} 에피소드 학습.`);
+      return;
+    }
+    runBatchEpisodes(batch);
+    updateChart();
+    updateStats();
+    setStatus(`학습 중... ${episodes} / ${totalTarget} 에피소드`);
+    animId = requestAnimationFrame(tick);
+  }
+  animId = requestAnimationFrame(tick);
+}
+
+// ─── Button handlers ───────────────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click', ()=>{
+  if(running){
+    running = false;
+    document.getElementById('btnRun').textContent = '▶ Run';
+    setStatus(`일시정지. ${episodes} 에피소드 완료.`);
+  } else {
+    runAnimated(episodes + 500);
+  }
+});
+
+document.getElementById('btn100').addEventListener('click', ()=>{
+  if(!running) runAnimated(episodes + 100);
+});
+
+document.getElementById('btn500').addEventListener('click', ()=>{
+  if(!running) runAnimated(episodes + 500);
+});
+
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(animId) cancelAnimationFrame(animId);
+  running = false;
+  document.getElementById('btnRun').textContent = '▶ Run';
+  if(chart){ chart.destroy(); chart = null; }
+  init();
+});
+
+document.getElementById('nSlider').addEventListener('input', ()=>{
+  let n = document.getElementById('nSlider').value;
+  document.getElementById('nDisplay').textContent = `현재 n = ${n}`;
+  updateChart();
+  updateStats();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+init();
+</script>
+
+<script>
+(function(){
+  function sendH(){window.parent.postMessage({type:'sim-resize',h:document.documentElement.scrollHeight},'*');}
+  if(window.ResizeObserver){new ResizeObserver(sendH).observe(document.documentElement);}
+  window.addEventListener('load',sendH); sendH();
+})();
+</script>
+</body>
+</html>
